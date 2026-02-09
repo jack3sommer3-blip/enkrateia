@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import DailyLog from "@/app/components/DailyLog";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
-import { getProfile, Profile } from "@/lib/profile";
+import { getProfile } from "@/lib/profile";
+import type { Profile } from "@/lib/types";
 import { todayKey } from "@/lib/utils";
 
 export default function TodayPage() {

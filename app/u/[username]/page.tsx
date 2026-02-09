@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
-import { useSession } from "@/app/components/useSession";
-import { getProfile } from "@/lib/profile";
+import { getProfileByUsername } from "@/lib/profile";
 import type { Profile } from "@/lib/types";
 
 function initials(profile: Profile) {
@@ -15,31 +14,30 @@ function initials(profile: Profile) {
   return `${first}${last}`.toUpperCase();
 }
 
-export default function ProfilePage() {
-  const router = useRouter();
-  const { loading, userId } = useSession();
+export default function PublicProfilePage() {
+  const params = useParams<{ username: string }>();
+  const username = params?.username?.toLowerCase();
   const [profile, setProfile] = useState<Profile | undefined>();
-  const [profileLoading, setProfileLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (loading) return;
-    if (!userId) {
-      router.replace("/login");
-      return;
-    }
-    setProfileLoading(true);
-    getProfile(userId).then((data) => {
+    if (!username) return;
+    setLoading(true);
+    getProfileByUsername(username).then((data) => {
       setProfile(data);
-      setProfileLoading(false);
-      if (!data) router.replace("/onboarding");
+      setLoading(false);
     });
-  }, [loading, router, userId]);
+  }, [username]);
 
-  if (loading || profileLoading) {
-    return <StoryLoading name={profile?.first_name} />;
+  if (loading) return <StoryLoading />;
+
+  if (!profile) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+        <div className="text-gray-400">Profile not found.</div>
+      </main>
+    );
   }
-
-  if (!userId || !profile) return null;
 
   const displayName = profile.display_name || `${profile.first_name} ${profile.last_name}`;
 
@@ -78,10 +76,10 @@ export default function ProfilePage() {
             </div>
 
             <Link
-              href={`/u/${profile.username}`}
+              href="/"
               className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
             >
-              Share profile
+              Back to app
             </Link>
           </div>
 

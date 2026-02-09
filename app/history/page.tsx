@@ -7,7 +7,8 @@ import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
-import { getProfile, Profile } from "@/lib/profile";
+import { getProfile } from "@/lib/profile";
+import type { Profile } from "@/lib/types";
 import { addDays, startOfDay, toDateKey } from "@/lib/utils";
 
 type LogRow = {

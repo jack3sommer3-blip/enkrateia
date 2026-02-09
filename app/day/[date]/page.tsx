@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import DailyLog from "@/app/components/DailyLog";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
-import { getProfile, Profile } from "@/lib/profile";
+import { getProfile } from "@/lib/profile";
+import type { Profile } from "@/lib/types";
 
 function isValidDateKey(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);

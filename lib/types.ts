@@ -44,3 +44,16 @@ export type DayScore = {
   dietScore: number;
   readingScore: number;
 };
+
+export type Profile = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  location: string | null;
+  website: string | null;
+  created_at: string | null;
+  first_name: string;
+  last_name: string;
+};

@@ -10,6 +10,7 @@ import { getProfile } from "@/lib/profile";
 export default function OnboardingPage() {
   const router = useRouter();
   const { loading, userId, email } = useSession();
+  const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
@@ -33,11 +34,16 @@ export default function OnboardingPage() {
       setError("Please fill out all fields.");
       return;
     }
+    if (!USERNAME_REGEX.test(username.trim())) {
+      setError("Username must be 3–20 characters: a-z, 0-9, underscore.");
+      return;
+    }
     setSaving(true);
     const { error: insertError } = await supabase.from("profiles").insert({
       id: userId,
       email,
       username: username.trim(),
+      display_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
       first_name: firstName.trim(),
       last_name: lastName.trim(),
     });
