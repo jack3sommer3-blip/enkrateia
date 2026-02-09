@@ -25,6 +25,18 @@ function id() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function splitHoursToParts(raw?: string) {
+  if (!raw) return { hoursText: undefined, minutesText: undefined };
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return { hoursText: raw, minutesText: undefined };
+  const hours = Math.trunc(n);
+  const minutes = Math.round((n - hours) * 60);
+  return {
+    hoursText: String(hours),
+    minutesText: String(clampInt(minutes, 0, 59)),
+  };
+}
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export default function DailyLog({
@@ -58,6 +70,11 @@ export default function DailyLog({
 
       if (row?.data) {
         const parsed = row.data as DayData;
+        const legacySleep = textFromUnknown(
+          (parsed as DayData & { sleep?: { hours?: number } }).sleep?.hours ??
+            parsed?.sleep?.hoursText
+        );
+        const sleepParts = splitHoursToParts(legacySleep);
         setData({
           ...DEFAULT_DATA,
           ...parsed,
@@ -83,6 +100,11 @@ export default function DailyLog({
                     activity.intensityText
                 ),
               })) ?? [],
+          },
+          sleep: {
+            hoursText: parsed?.sleep?.hoursText ?? sleepParts.hoursText,
+            minutesText: parsed?.sleep?.minutesText ?? sleepParts.minutesText,
+            restingHrText: parsed?.sleep?.restingHrText,
           },
         });
       } else {
@@ -143,6 +165,8 @@ export default function DailyLog({
   }, [data.workouts.activities]);
 
   const sleepHours = numFromText(data.sleep.hoursText) ?? 0;
+  const sleepMinutes = clampInt(intFromText(data.sleep.minutesText) ?? 0, 0, 59);
+  const sleepTotalHours = sleepHours + sleepMinutes / 60;
   const cookedMeals = intFromText(data.diet.cookedMealsText) ?? 0;
   const restaurantMeals = intFromText(data.diet.restaurantMealsText) ?? 0;
   const totalMeals = cookedMeals + restaurantMeals;
@@ -368,7 +392,6 @@ export default function DailyLog({
                           inputMode="numeric"
                           placeholder="e.g., 45"
                           value={a.minutesText ?? ""}
-                          onFocus={(e) => e.currentTarget.select()}
                           onChange={(e) =>
                             updateActivity(a.id, { minutesText: e.target.value })
                           }
@@ -386,7 +409,6 @@ export default function DailyLog({
                           inputMode="numeric"
                           placeholder="e.g., 30"
                           value={a.secondsText ?? ""}
-                          onFocus={(e) => e.currentTarget.select()}
                           onChange={(e) =>
                             updateActivity(a.id, { secondsText: e.target.value })
                           }
@@ -404,7 +426,6 @@ export default function DailyLog({
                           inputMode="numeric"
                           placeholder="e.g., 320"
                           value={a.caloriesText ?? ""}
-                          onFocus={(e) => e.currentTarget.select()}
                           onChange={(e) =>
                             updateActivity(a.id, { caloriesText: e.target.value })
                           }
@@ -422,7 +443,6 @@ export default function DailyLog({
                           inputMode="numeric"
                           placeholder="1–9"
                           value={a.intensityText ?? ""}
-                          onFocus={(e) => e.currentTarget.select()}
                           onChange={(e) =>
                             updateActivity(a.id, { intensityText: e.target.value })
                           }
@@ -452,23 +472,55 @@ export default function DailyLog({
           <Card
             title="Sleep"
             subtitle="Earn up to 25 points at 8+ hours."
-            hint={`Hours today: ${formatScore(sleepHours)} / 8  •  Score: ${formatScore(
+            hint={`Hours today: ${formatScore(sleepTotalHours)} / 8  •  Score: ${formatScore(
               scores.sleepScore
             )}/25`}
             earned={scores.sleepScore >= 25}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label>Hours slept</Label>
                 <Input
-                  inputMode="decimal"
-                  pattern="^\\d*(\\.\\d*)?$"
-                  placeholder="e.g., 7.5"
+                  inputMode="numeric"
+                  placeholder="e.g., 7"
                   value={data.sleep.hoursText ?? ""}
                   onChange={(e) =>
                     setData((prev) => ({
                       ...prev,
                       sleep: { ...prev.sleep, hoursText: e.target.value },
+                    }))
+                  }
+                  onBlur={(e) =>
+                    setData((prev) => ({
+                      ...prev,
+                      sleep: {
+                        ...prev.sleep,
+                        hoursText: normalizeIntText(e.target.value, 0),
+                      },
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label>Minutes slept</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 30"
+                  value={data.sleep.minutesText ?? ""}
+                  onChange={(e) =>
+                    setData((prev) => ({
+                      ...prev,
+                      sleep: { ...prev.sleep, minutesText: e.target.value },
+                    }))
+                  }
+                  onBlur={(e) =>
+                    setData((prev) => ({
+                      ...prev,
+                      sleep: {
+                        ...prev.sleep,
+                        minutesText: normalizeIntText(e.target.value, 0, 59),
+                      },
                     }))
                   }
                 />
@@ -480,7 +532,6 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 52"
                   value={data.sleep.restingHrText ?? ""}
-                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) =>
                     setData((prev) => ({
                       ...prev,
@@ -516,7 +567,6 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 2"
                   value={data.diet.cookedMealsText ?? ""}
-                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) =>
                     setData((prev) => ({
                       ...prev,
@@ -541,7 +591,6 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 1"
                   value={data.diet.restaurantMealsText ?? ""}
-                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) =>
                     setData((prev) => ({
                       ...prev,
@@ -591,7 +640,6 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 20"
                   value={data.reading.pagesText ?? ""}
-                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) =>
                     setData((prev) => ({
                       ...prev,

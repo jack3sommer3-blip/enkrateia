@@ -22,6 +22,7 @@ export type DayData = {
   };
   sleep: {
     hoursText?: string;
+    minutesText?: string;
     restingHrText?: string;
   };
   diet: {

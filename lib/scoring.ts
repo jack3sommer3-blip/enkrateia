@@ -9,13 +9,15 @@ export function computeScores(data: DayData): DayScore {
   }, 0);
 
   const sleepHours = numFromText(data.sleep.hoursText) ?? 0;
+  const sleepMinutes = clampInt(intFromText(data.sleep.minutesText) ?? 0, 0, 59);
+  const sleepTotalHours = sleepHours + sleepMinutes / 60;
   const cookedMeals = intFromText(data.diet.cookedMealsText) ?? 0;
   const restaurantMeals = intFromText(data.diet.restaurantMealsText) ?? 0;
   const totalMeals = cookedMeals + restaurantMeals;
   const pagesRead = intFromText(data.reading.pagesText) ?? 0;
 
   const workoutScore = Math.min(totalWorkoutMinutes / 60, 1) * 25;
-  const sleepScore = Math.min(sleepHours / 8, 1) * 25;
+  const sleepScore = Math.min(sleepTotalHours / 8, 1) * 25;
   const dietScore = totalMeals > 0 ? (cookedMeals / totalMeals) * 25 : 0;
   const readingScore = Math.min(pagesRead / 20, 1) * 25;
 
