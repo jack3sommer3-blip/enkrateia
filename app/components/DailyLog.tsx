@@ -9,7 +9,6 @@ import {
   clampInt,
   formatScore,
   intFromText,
-  normalizeIntText,
   numFromText,
   textFromUnknown,
 } from "@/lib/utils";
@@ -37,8 +36,6 @@ function splitHoursToParts(raw?: string) {
   };
 }
 
-type SaveState = "idle" | "saving" | "saved" | "error";
-
 export default function DailyLog({
   dateKey,
   userId,
@@ -50,7 +47,6 @@ export default function DailyLog({
 }) {
   const [data, setData] = useState<DayData>(DEFAULT_DATA);
   const [hydrated, setHydrated] = useState(false);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -124,8 +120,6 @@ export default function DailyLog({
     if (!hydrated) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
 
-    setSaveState("saving");
-    setSaveError(null);
     saveTimer.current = setTimeout(async () => {
       const scores = computeScores(data);
       const payload = {
@@ -144,10 +138,9 @@ export default function DailyLog({
         .upsert(payload, { onConflict: "user_id,date" });
 
       if (error) {
-        setSaveState("error");
         setSaveError(error.message);
-      } else {
-        setSaveState("saved");
+      } else if (saveError) {
+        setSaveError(null);
       }
     }, 600);
 
@@ -321,16 +314,12 @@ export default function DailyLog({
                 {dateKey}
               </div>
 
-              <div className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-400">
-                {saveState === "saving"
-                  ? "Saving…"
-                  : saveState === "saved"
-                    ? "Saved"
-                    : saveState === "error"
-                      ? "Save failed"
-                      : "Ready"}
+              <div className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-400 min-w-[160px] text-center">
+                Auto-save on
               </div>
-              {saveState === "error" && saveError ? (
+            </div>
+            <div className="min-h-[40px]">
+              {saveError ? (
                 <div className="px-4 py-2 rounded-xl bg-rose-950 border border-rose-800 text-rose-200 text-sm">
                   {saveError}
                 </div>
@@ -395,11 +384,6 @@ export default function DailyLog({
                           onChange={(e) =>
                             updateActivity(a.id, { minutesText: e.target.value })
                           }
-                          onBlur={(e) =>
-                            updateActivity(a.id, {
-                              minutesText: normalizeIntText(e.target.value, 0),
-                            })
-                          }
                         />
                       </div>
 
@@ -411,11 +395,6 @@ export default function DailyLog({
                           value={a.secondsText ?? ""}
                           onChange={(e) =>
                             updateActivity(a.id, { secondsText: e.target.value })
-                          }
-                          onBlur={(e) =>
-                            updateActivity(a.id, {
-                              secondsText: normalizeIntText(e.target.value, 0, 59),
-                            })
                           }
                         />
                       </div>
@@ -429,11 +408,6 @@ export default function DailyLog({
                           onChange={(e) =>
                             updateActivity(a.id, { caloriesText: e.target.value })
                           }
-                          onBlur={(e) =>
-                            updateActivity(a.id, {
-                              caloriesText: normalizeIntText(e.target.value, 0),
-                            })
-                          }
                         />
                       </div>
 
@@ -445,11 +419,6 @@ export default function DailyLog({
                           value={a.intensityText ?? ""}
                           onChange={(e) =>
                             updateActivity(a.id, { intensityText: e.target.value })
-                          }
-                          onBlur={(e) =>
-                            updateActivity(a.id, {
-                              intensityText: normalizeIntText(e.target.value, 1, 9),
-                            })
                           }
                         />
                       </div>
@@ -490,15 +459,6 @@ export default function DailyLog({
                       sleep: { ...prev.sleep, hoursText: e.target.value },
                     }))
                   }
-                  onBlur={(e) =>
-                    setData((prev) => ({
-                      ...prev,
-                      sleep: {
-                        ...prev.sleep,
-                        hoursText: normalizeIntText(e.target.value, 0),
-                      },
-                    }))
-                  }
                 />
               </div>
 
@@ -514,15 +474,6 @@ export default function DailyLog({
                       sleep: { ...prev.sleep, minutesText: e.target.value },
                     }))
                   }
-                  onBlur={(e) =>
-                    setData((prev) => ({
-                      ...prev,
-                      sleep: {
-                        ...prev.sleep,
-                        minutesText: normalizeIntText(e.target.value, 0, 59),
-                      },
-                    }))
-                  }
                 />
               </div>
 
@@ -536,15 +487,6 @@ export default function DailyLog({
                     setData((prev) => ({
                       ...prev,
                       sleep: { ...prev.sleep, restingHrText: e.target.value },
-                    }))
-                  }
-                  onBlur={(e) =>
-                    setData((prev) => ({
-                      ...prev,
-                      sleep: {
-                        ...prev.sleep,
-                        restingHrText: normalizeIntText(e.target.value, 0),
-                      },
                     }))
                   }
                 />
@@ -573,15 +515,6 @@ export default function DailyLog({
                       diet: { ...prev.diet, cookedMealsText: e.target.value },
                     }))
                   }
-                  onBlur={(e) =>
-                    setData((prev) => ({
-                      ...prev,
-                      diet: {
-                        ...prev.diet,
-                        cookedMealsText: normalizeIntText(e.target.value, 0),
-                      },
-                    }))
-                  }
                 />
               </div>
 
@@ -595,15 +528,6 @@ export default function DailyLog({
                     setData((prev) => ({
                       ...prev,
                       diet: { ...prev.diet, restaurantMealsText: e.target.value },
-                    }))
-                  }
-                  onBlur={(e) =>
-                    setData((prev) => ({
-                      ...prev,
-                      diet: {
-                        ...prev.diet,
-                        restaurantMealsText: normalizeIntText(e.target.value, 0),
-                      },
                     }))
                   }
                 />
@@ -644,15 +568,6 @@ export default function DailyLog({
                     setData((prev) => ({
                       ...prev,
                       reading: { ...prev.reading, pagesText: e.target.value },
-                    }))
-                  }
-                  onBlur={(e) =>
-                    setData((prev) => ({
-                      ...prev,
-                      reading: {
-                        ...prev.reading,
-                        pagesText: normalizeIntText(e.target.value, 0),
-                      },
                     }))
                   }
                 />
