@@ -165,6 +165,7 @@ export default function DailyLog({
   const totalMeals = cookedMeals + restaurantMeals;
   const pagesRead = intFromText(data.reading.pagesText) ?? 0;
   const scores = computeScores(data);
+  const formKey = `${dateKey}-${hydrated ? "ready" : "loading"}`;
 
   const completedCount =
     (scores.workoutScore >= 25 ? 1 : 0) +
@@ -330,7 +331,7 @@ export default function DailyLog({
           <Nav />
         </header>
 
-        <div className="grid grid-cols-1 gap-6">
+        <div key={formKey} className="grid grid-cols-1 gap-6">
           <Card
             title="Workout"
             subtitle="Log activities; earn up to 25 points at 60+ total minutes."
@@ -380,9 +381,9 @@ export default function DailyLog({
                         <Input
                           inputMode="numeric"
                           placeholder="e.g., 45"
-                          value={a.minutesText ?? ""}
-                          onChange={(e) =>
-                            updateActivity(a.id, { minutesText: e.target.value })
+                          defaultValue={a.minutesText ?? ""}
+                          onBlur={(e) =>
+                            updateActivity(a.id, { minutesText: e.currentTarget.value })
                           }
                         />
                       </div>
@@ -392,9 +393,9 @@ export default function DailyLog({
                         <Input
                           inputMode="numeric"
                           placeholder="e.g., 30"
-                          value={a.secondsText ?? ""}
-                          onChange={(e) =>
-                            updateActivity(a.id, { secondsText: e.target.value })
+                          defaultValue={a.secondsText ?? ""}
+                          onBlur={(e) =>
+                            updateActivity(a.id, { secondsText: e.currentTarget.value })
                           }
                         />
                       </div>
@@ -404,9 +405,9 @@ export default function DailyLog({
                         <Input
                           inputMode="numeric"
                           placeholder="e.g., 320"
-                          value={a.caloriesText ?? ""}
-                          onChange={(e) =>
-                            updateActivity(a.id, { caloriesText: e.target.value })
+                          defaultValue={a.caloriesText ?? ""}
+                          onBlur={(e) =>
+                            updateActivity(a.id, { caloriesText: e.currentTarget.value })
                           }
                         />
                       </div>
@@ -416,9 +417,9 @@ export default function DailyLog({
                         <Input
                           inputMode="numeric"
                           placeholder="1–9"
-                          value={a.intensityText ?? ""}
-                          onChange={(e) =>
-                            updateActivity(a.id, { intensityText: e.target.value })
+                          defaultValue={a.intensityText ?? ""}
+                          onBlur={(e) =>
+                            updateActivity(a.id, { intensityText: e.currentTarget.value })
                           }
                         />
                       </div>
@@ -452,11 +453,11 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 7"
-                  value={data.sleep.hoursText ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.sleep.hoursText ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      sleep: { ...prev.sleep, hoursText: e.target.value },
+                      sleep: { ...prev.sleep, hoursText: e.currentTarget.value },
                     }))
                   }
                 />
@@ -467,11 +468,11 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 30"
-                  value={data.sleep.minutesText ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.sleep.minutesText ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      sleep: { ...prev.sleep, minutesText: e.target.value },
+                      sleep: { ...prev.sleep, minutesText: e.currentTarget.value },
                     }))
                   }
                 />
@@ -482,11 +483,14 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 52"
-                  value={data.sleep.restingHrText ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.sleep.restingHrText ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      sleep: { ...prev.sleep, restingHrText: e.target.value },
+                      sleep: {
+                        ...prev.sleep,
+                        restingHrText: e.currentTarget.value,
+                      },
                     }))
                   }
                 />
@@ -508,11 +512,11 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 2"
-                  value={data.diet.cookedMealsText ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.diet.cookedMealsText ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      diet: { ...prev.diet, cookedMealsText: e.target.value },
+                      diet: { ...prev.diet, cookedMealsText: e.currentTarget.value },
                     }))
                   }
                 />
@@ -523,11 +527,14 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 1"
-                  value={data.diet.restaurantMealsText ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.diet.restaurantMealsText ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      diet: { ...prev.diet, restaurantMealsText: e.target.value },
+                      diet: {
+                        ...prev.diet,
+                        restaurantMealsText: e.currentTarget.value,
+                      },
                     }))
                   }
                 />
@@ -548,11 +555,11 @@ export default function DailyLog({
                 <Label>Book title</Label>
                 <Input
                   placeholder="e.g., Meditations"
-                  value={data.reading.title ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.reading.title ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      reading: { ...prev.reading, title: e.target.value },
+                      reading: { ...prev.reading, title: e.currentTarget.value },
                     }))
                   }
                 />
@@ -563,11 +570,11 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 20"
-                  value={data.reading.pagesText ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.reading.pagesText ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      reading: { ...prev.reading, pagesText: e.target.value },
+                      reading: { ...prev.reading, pagesText: e.currentTarget.value },
                     }))
                   }
                 />
@@ -577,11 +584,11 @@ export default function DailyLog({
                 <Label>Favorite quote (optional)</Label>
                 <Input
                   placeholder="Paste a line that hit."
-                  value={data.reading.quote ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.reading.quote ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      reading: { ...prev.reading, quote: e.target.value },
+                      reading: { ...prev.reading, quote: e.currentTarget.value },
                     }))
                   }
                 />
@@ -592,11 +599,11 @@ export default function DailyLog({
                 <TextArea
                   rows={4}
                   placeholder="Quick thoughts, what you learned, what you’ll apply…"
-                  value={data.reading.note ?? ""}
-                  onChange={(e) =>
+                  defaultValue={data.reading.note ?? ""}
+                  onBlur={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      reading: { ...prev.reading, note: e.target.value },
+                      reading: { ...prev.reading, note: e.currentTarget.value },
                     }))
                   }
                 />
