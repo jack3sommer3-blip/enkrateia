@@ -211,7 +211,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-2">
             <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
             <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-              Hello {profile.first_name}.
+              Hello, {profile.first_name}.
             </h1>
             <p className="text-gray-400">
               Enkrateia: self-mastery. Akrasia: knowing the good, and failing to do it.

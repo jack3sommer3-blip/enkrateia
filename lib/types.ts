@@ -19,6 +19,7 @@ export type WorkoutActivity = {
 export type DayData = {
   workouts: {
     activities: WorkoutActivity[];
+    stepsText?: string;
   };
   sleep: {
     hoursText?: string;
@@ -28,10 +29,14 @@ export type DayData = {
   diet: {
     cookedMealsText?: string;
     restaurantMealsText?: string;
+    healthinessText?: string;
+    proteinText?: string;
   };
   reading: {
     title?: string;
     pagesText?: string;
+    fictionPagesText?: string;
+    nonfictionPagesText?: string;
     note?: string;
     quote?: string;
   };
@@ -56,4 +61,16 @@ export type Profile = {
   created_at: string | null;
   first_name: string;
   last_name: string;
+};
+
+export type GoalCategory = {
+  enabled: string[];
+  targets: Record<string, number>;
+};
+
+export type Goals = {
+  exercise: GoalCategory;
+  sleep: GoalCategory;
+  diet: GoalCategory;
+  reading: GoalCategory;
 };

@@ -5,6 +5,7 @@ import Nav from "@/app/components/Nav";
 import { supabase } from "@/lib/supabase";
 import { DayData, ActivityType, WorkoutActivity } from "@/lib/types";
 import { computeScores } from "@/lib/scoring";
+import { getDefaultGoals, normalizeGoals } from "@/lib/goals";
 import {
   clampInt,
   formatScore,
@@ -49,6 +50,7 @@ export default function DailyLog({
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [goals, setGoals] = useState(getDefaultGoals());
 
   useEffect(() => {
     let mounted = true;
@@ -117,11 +119,31 @@ export default function DailyLog({
   }, [dateKey, userId]);
 
   useEffect(() => {
+    let mounted = true;
+    supabase
+      .from("user_goals")
+      .select("goals")
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!mounted) return;
+        if (data?.goals) {
+          setGoals(normalizeGoals(data.goals));
+        } else {
+          setGoals(getDefaultGoals());
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
+
+  useEffect(() => {
     if (!hydrated) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
 
     saveTimer.current = setTimeout(async () => {
-      const scores = computeScores(data);
+      const scores = computeScores(data, goals);
       const payload = {
         user_id: userId,
         date: dateKey,
@@ -164,7 +186,7 @@ export default function DailyLog({
   const restaurantMeals = intFromText(data.diet.restaurantMealsText) ?? 0;
   const totalMeals = cookedMeals + restaurantMeals;
   const pagesRead = intFromText(data.reading.pagesText) ?? 0;
-  const scores = computeScores(data);
+  const scores = computeScores(data, goals);
   const formKey = `${dateKey}-${hydrated ? "ready" : "loading"}`;
 
   const completedCount =
@@ -333,11 +355,11 @@ export default function DailyLog({
 
         <div key={formKey} className="grid grid-cols-1 gap-6">
           <Card
-            title="Workout"
-            subtitle="Log activities; earn up to 25 points at 60+ total minutes."
+            title="Exercise"
+            subtitle="Log activities; earn up to 25 points based on your goals."
             hint={`Total minutes today: ${formatScore(
               totalWorkoutMinutes
-            )} / 60  •  Score: ${formatScore(scores.workoutScore)}/25`}
+            )}  •  Score: ${formatScore(scores.workoutScore)}/25`}
             earned={scores.workoutScore >= 25}
           >
             <div className="flex items-center gap-3">
@@ -347,6 +369,27 @@ export default function DailyLog({
               >
                 Add activity
               </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Steps (optional)</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 8000"
+                  defaultValue={data.workouts.stepsText ?? ""}
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      workouts: { ...prev.workouts, stepsText: value },
+                    }));
+                  }}
+                />
+              </div>
+              <div className="md:col-span-2 text-gray-500 text-sm flex items-center">
+                Workouts logged are counted from activities below.
+              </div>
             </div>
 
             {data.workouts.activities.length === 0 ? (
@@ -445,7 +488,7 @@ export default function DailyLog({
 
           <Card
             title="Sleep"
-            subtitle="Earn up to 25 points at 8+ hours."
+            subtitle="Earn up to 25 points based on your goals."
             hint={`Hours today: ${formatScore(sleepTotalHours)} / 8  •  Score: ${formatScore(
               scores.sleepScore
             )}/25`}
@@ -507,7 +550,7 @@ export default function DailyLog({
 
           <Card
             title="Diet"
-            subtitle="Earn up to 25 points based on cooked percentage."
+            subtitle="Earn up to 25 points based on your goals."
             hint={`Cooked: ${cookedMeals}  •  Restaurant: ${restaurantMeals}  •  Score: ${formatScore(
               scores.dietScore
             )}/25`}
@@ -549,11 +592,44 @@ export default function DailyLog({
                 />
               </div>
             </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Healthiness (1–10)</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 7"
+                  defaultValue={data.diet.healthinessText ?? ""}
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      diet: { ...prev.diet, healthinessText: value },
+                    }));
+                  }}
+                />
+              </div>
+              <div>
+                <Label>Protein grams</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 150"
+                  defaultValue={data.diet.proteinText ?? ""}
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      diet: { ...prev.diet, proteinText: value },
+                    }));
+                  }}
+                />
+              </div>
+            </div>
           </Card>
 
           <Card
             title="Reading"
-            subtitle="Log what you read; earn up to 25 points at 20 pages."
+            subtitle="Log what you read; earn up to 25 points based on your goals."
             hint={`Pages today: ${pagesRead} / 20  •  Score: ${formatScore(
               scores.readingScore
             )}/25`}
@@ -586,6 +662,38 @@ export default function DailyLog({
                     setData((prev) => ({
                       ...prev,
                       reading: { ...prev.reading, pagesText: value },
+                    }));
+                  }}
+                />
+              </div>
+
+              <div>
+                <Label>Fiction pages</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 10"
+                  defaultValue={data.reading.fictionPagesText ?? ""}
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      reading: { ...prev.reading, fictionPagesText: value },
+                    }));
+                  }}
+                />
+              </div>
+
+              <div>
+                <Label>Non-fiction pages</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 10"
+                  defaultValue={data.reading.nonfictionPagesText ?? ""}
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      reading: { ...prev.reading, nonfictionPagesText: value },
                     }));
                   }}
                 />

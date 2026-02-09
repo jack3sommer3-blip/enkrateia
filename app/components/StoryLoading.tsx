@@ -23,7 +23,7 @@ export default function StoryLoading({ name }: { name?: string }) {
       <div className="w-full max-w-3xl">
         <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
         <h1 className="mt-4 text-4xl md:text-6xl font-semibold leading-tight">
-          {name ? `Hello ${name}.` : "Welcome."}
+          {name ? `Hello, ${name}.` : "Welcome."}
         </h1>
         <p className="mt-6 text-lg text-gray-300 min-h-[3.5rem]">
           {MESSAGES[index]}

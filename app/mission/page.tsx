@@ -15,7 +15,6 @@ const MISSION = [
   "You train your body.\nYou sharpen your mind.\nYou guard your sleep.\nYou prepare your meals.\nYou account for your days.",
   "What is measured is confronted.\nWhat is confronted is improved.",
   "Enkrateia provides structure where impulse would otherwise rule.",
-  "A record of your effort. A visible account of your standards. A daily decision to choose the harder path.",
   "The question is not whether the world tempts you.",
   "The question is whether you will answer.",
   "Enkrateia is a system for those who intend to.",

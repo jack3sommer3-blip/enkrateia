@@ -104,6 +104,17 @@ export default function SettingsPage() {
         </header>
 
         <section className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
+          <div className="mb-6 flex items-center gap-3">
+            <a
+              href="/goals"
+              className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+            >
+              Edit goals
+            </a>
+            <div className="text-sm text-gray-500">
+              Goals control how daily scores are calculated.
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <div className="text-gray-400 text-sm mb-1">Username</div>
