@@ -382,9 +382,10 @@ export default function DailyLog({
                           inputMode="numeric"
                           placeholder="e.g., 45"
                           defaultValue={a.minutesText ?? ""}
-                          onBlur={(e) =>
-                            updateActivity(a.id, { minutesText: e.currentTarget.value })
-                          }
+                          onBlur={(e) => {
+                            const value = e.currentTarget.value;
+                            updateActivity(a.id, { minutesText: value });
+                          }}
                         />
                       </div>
 
@@ -394,9 +395,10 @@ export default function DailyLog({
                           inputMode="numeric"
                           placeholder="e.g., 30"
                           defaultValue={a.secondsText ?? ""}
-                          onBlur={(e) =>
-                            updateActivity(a.id, { secondsText: e.currentTarget.value })
-                          }
+                          onBlur={(e) => {
+                            const value = e.currentTarget.value;
+                            updateActivity(a.id, { secondsText: value });
+                          }}
                         />
                       </div>
 
@@ -406,9 +408,10 @@ export default function DailyLog({
                           inputMode="numeric"
                           placeholder="e.g., 320"
                           defaultValue={a.caloriesText ?? ""}
-                          onBlur={(e) =>
-                            updateActivity(a.id, { caloriesText: e.currentTarget.value })
-                          }
+                          onBlur={(e) => {
+                            const value = e.currentTarget.value;
+                            updateActivity(a.id, { caloriesText: value });
+                          }}
                         />
                       </div>
 
@@ -418,9 +421,10 @@ export default function DailyLog({
                           inputMode="numeric"
                           placeholder="1–9"
                           defaultValue={a.intensityText ?? ""}
-                          onBlur={(e) =>
-                            updateActivity(a.id, { intensityText: e.currentTarget.value })
-                          }
+                          onBlur={(e) => {
+                            const value = e.currentTarget.value;
+                            updateActivity(a.id, { intensityText: value });
+                          }}
                         />
                       </div>
                     </div>
@@ -454,12 +458,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 7"
                   defaultValue={data.sleep.hoursText ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
-                      sleep: { ...prev.sleep, hoursText: e.currentTarget.value },
-                    }))
-                  }
+                      sleep: { ...prev.sleep, hoursText: value },
+                    }));
+                  }}
                 />
               </div>
 
@@ -469,12 +474,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 30"
                   defaultValue={data.sleep.minutesText ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
-                      sleep: { ...prev.sleep, minutesText: e.currentTarget.value },
-                    }))
-                  }
+                      sleep: { ...prev.sleep, minutesText: value },
+                    }));
+                  }}
                 />
               </div>
 
@@ -484,15 +490,16 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 52"
                   defaultValue={data.sleep.restingHrText ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
                       sleep: {
                         ...prev.sleep,
-                        restingHrText: e.currentTarget.value,
+                        restingHrText: value,
                       },
-                    }))
-                  }
+                    }));
+                  }}
                 />
               </div>
             </div>
@@ -513,12 +520,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 2"
                   defaultValue={data.diet.cookedMealsText ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
-                      diet: { ...prev.diet, cookedMealsText: e.currentTarget.value },
-                    }))
-                  }
+                      diet: { ...prev.diet, cookedMealsText: value },
+                    }));
+                  }}
                 />
               </div>
 
@@ -528,15 +536,16 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 1"
                   defaultValue={data.diet.restaurantMealsText ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
                       diet: {
                         ...prev.diet,
-                        restaurantMealsText: e.currentTarget.value,
+                        restaurantMealsText: value,
                       },
-                    }))
-                  }
+                    }));
+                  }}
                 />
               </div>
             </div>
@@ -556,12 +565,13 @@ export default function DailyLog({
                 <Input
                   placeholder="e.g., Meditations"
                   defaultValue={data.reading.title ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
-                      reading: { ...prev.reading, title: e.currentTarget.value },
-                    }))
-                  }
+                      reading: { ...prev.reading, title: value },
+                    }));
+                  }}
                 />
               </div>
 
@@ -571,12 +581,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 20"
                   defaultValue={data.reading.pagesText ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
-                      reading: { ...prev.reading, pagesText: e.currentTarget.value },
-                    }))
-                  }
+                      reading: { ...prev.reading, pagesText: value },
+                    }));
+                  }}
                 />
               </div>
 
@@ -585,12 +596,13 @@ export default function DailyLog({
                 <Input
                   placeholder="Paste a line that hit."
                   defaultValue={data.reading.quote ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
-                      reading: { ...prev.reading, quote: e.currentTarget.value },
-                    }))
-                  }
+                      reading: { ...prev.reading, quote: value },
+                    }));
+                  }}
                 />
               </div>
 
@@ -600,12 +612,13 @@ export default function DailyLog({
                   rows={4}
                   placeholder="Quick thoughts, what you learned, what you’ll apply…"
                   defaultValue={data.reading.note ?? ""}
-                  onBlur={(e) =>
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
-                      reading: { ...prev.reading, note: e.currentTarget.value },
-                    }))
-                  }
+                      reading: { ...prev.reading, note: value },
+                    }));
+                  }}
                 />
               </div>
             </div>
