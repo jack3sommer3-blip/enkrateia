@@ -170,6 +170,42 @@ function readingSummary(event: ReadingEvent) {
   return event.title ? `${base} • ${event.title}` : base;
 }
 
+function isValidWorkout(activity: WorkoutActivity) {
+  const minutes = intFromText(activity.minutesText) ?? 0;
+  const seconds = intFromText(activity.secondsText) ?? 0;
+  const calories = intFromText(activity.caloriesText) ?? 0;
+  const intensity = intFromText(activity.intensityText) ?? 0;
+  return minutes > 0 || seconds > 0 || calories > 0 || intensity > 0;
+}
+
+function isValidReading(event: ReadingEvent) {
+  const totalPages =
+    event.pages ?? (event.fictionPages ?? 0) + (event.nonfictionPages ?? 0);
+  return (totalPages ?? 0) > 0 || !!event.title;
+}
+
+function isValidActivityItem(item: ActivityItem) {
+  if (item.event_type === "workout") {
+    const minutes = Number(item.metadata?.minutes ?? 0);
+    const seconds = Number(item.metadata?.seconds ?? 0);
+    const calories = Number(item.metadata?.calories ?? 0);
+    const intensity = Number(item.metadata?.intensity ?? 0);
+    return minutes > 0 || seconds > 0 || calories > 0 || intensity > 0;
+  }
+  if (item.event_type === "reading") {
+    const pages = Number(item.metadata?.pages ?? 0);
+    const fiction = Number(item.metadata?.fiction_pages ?? 0);
+    const nonfiction = Number(item.metadata?.nonfiction_pages ?? 0);
+    const title = String(item.metadata?.title ?? "").trim();
+    return pages > 0 || fiction > 0 || nonfiction > 0 || !!title;
+  }
+  if (item.event_type === "drinking") {
+    const drinks = Number(item.metadata?.drinks ?? 0);
+    return drinks > 0;
+  }
+  return true;
+}
+
 export async function backfillFeedItemsForUser(
   userId: string,
   days = 30
@@ -200,6 +236,7 @@ export async function backfillFeedItemsForUser(
 
     const activities = data?.workouts?.activities ?? [];
     activities.forEach((activity, index) => {
+      if (!isValidWorkout(activity)) return;
       const eventId = ensureUuid(activity.id, `${dateKey}-workout-${index}`);
       items.push({
         user_id: userId,
@@ -220,6 +257,7 @@ export async function backfillFeedItemsForUser(
     const readingEvents = data?.reading?.events ?? [];
     if (readingEvents.length > 0) {
       readingEvents.forEach((event, index) => {
+        if (!isValidReading(event)) return;
         const eventId = ensureUuid(event.id, `${dateKey}-reading-${index}`);
         items.push({
           user_id: userId,
@@ -238,6 +276,7 @@ export async function backfillFeedItemsForUser(
       });
     } else if (data?.reading?.title || data?.reading?.pagesText) {
       const pages = intFromText(data.reading.pagesText) ?? 0;
+      if (pages <= 0 && !data.reading.title) return;
       const eventId = stableUuid(`${dateKey}-reading-legacy`);
       items.push({
         user_id: userId,
@@ -265,6 +304,7 @@ export async function backfillFeedItemsForUser(
 
   if (!drinkingError && drinkingEvents) {
     drinkingEvents.forEach((event: any) => {
+      if (Number(event.drinks ?? 0) <= 0) return;
       items.push({
         user_id: userId,
         event_date: event.date,
@@ -521,11 +561,12 @@ export async function getFeedActivityStream(
   const errors: string[] = [];
   const start = addDays(new Date(), -(Math.max(days, 1) - 1));
   const startIso = start.toISOString();
-  const { items: selfItems, errors: selfErrors } = await getSelfActivityStream(
+  const { items: selfItemsRaw, errors: selfErrors } = await getSelfActivityStream(
     userId,
     days
   );
   errors.push(...selfErrors);
+  const selfItems = selfItemsRaw.filter(isValidActivityItem);
 
   const allIds = Array.from(new Set([userId, ...followedIds]));
   const { data: feedItems, error: feedError } = await supabase
@@ -553,7 +594,8 @@ export async function getFeedActivityStream(
       metadata: item.metadata ?? {},
       feed_item_id: item.id,
       profile: item.profiles ?? undefined,
-    }));
+    }))
+    .filter(isValidActivityItem);
 
   const feedMap = new Map<string, string>();
   (feedItems ?? []).forEach((item: any) => {
@@ -581,6 +623,7 @@ export async function getFeedActivityStream(
           metadata: item.metadata ?? {},
           feed_item_id: item.id,
         }))
+        .filter(isValidActivityItem)
     : [];
 
   const items = [...selfWithFeed, ...selfFromFeed, ...feedActivity];
@@ -617,4 +660,77 @@ export async function getActivityDebug(userId: string): Promise<ActivityDebug> {
     feedItemsCount30d: feedCount ?? 0,
     errors,
   };
+}
+
+export async function deleteActivity(
+  viewerId: string,
+  item: ActivityItem
+): Promise<{ ok: boolean; error?: string }> {
+  if (item.user_id !== viewerId) return { ok: false, error: "Not authorized" };
+
+  if (item.event_type === "drinking") {
+    const { error } = await supabase.from("drinking_events").delete().eq("id", item.event_id);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { data, error } = await supabase
+      .from("daily_logs")
+      .select("data")
+      .eq("user_id", viewerId)
+      .eq("date", item.event_date)
+      .single();
+
+    if (error) return { ok: false, error: error.message };
+    const dataValue = (data?.data ?? {}) as DayData;
+
+    if (item.event_type === "workout") {
+      const activities = dataValue?.workouts?.activities ?? [];
+      dataValue.workouts = {
+        ...dataValue.workouts,
+        activities: activities.filter((activity) => activity.id !== item.event_id),
+      };
+    }
+
+    if (item.event_type === "reading") {
+      const events = dataValue?.reading?.events ?? [];
+      dataValue.reading = {
+        ...dataValue.reading,
+        events: events.filter((event) => event.id !== item.event_id),
+      };
+      const legacyId = stableUuid(`${item.event_date}-reading-legacy`);
+      if (item.event_id === legacyId) {
+        dataValue.reading = {
+          ...dataValue.reading,
+          title: undefined,
+          pagesText: undefined,
+          fictionPagesText: undefined,
+          nonfictionPagesText: undefined,
+          note: undefined,
+          quote: undefined,
+        };
+      }
+    }
+
+    const { error: saveError } = await supabase.from("daily_logs").upsert(
+      {
+        user_id: viewerId,
+        date: item.event_date,
+        data: dataValue,
+      },
+      { onConflict: "user_id,date" }
+    );
+    if (saveError) return { ok: false, error: saveError.message };
+  }
+
+  if (item.feed_item_id) {
+    await supabase.from("feed_items").delete().eq("id", item.feed_item_id);
+  } else {
+    await supabase
+      .from("feed_items")
+      .delete()
+      .eq("user_id", viewerId)
+      .eq("event_type", item.event_type)
+      .eq("event_id", item.event_id);
+  }
+
+  return { ok: true };
 }

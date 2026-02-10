@@ -57,6 +57,24 @@ function splitHoursToParts(raw?: string) {
   };
 }
 
+function isValidWorkout(activity: WorkoutActivity) {
+  const minutes = intFromText(activity.minutesText) ?? 0;
+  const seconds = intFromText(activity.secondsText) ?? 0;
+  const calories = intFromText(activity.caloriesText) ?? 0;
+  const intensity = intFromText(activity.intensityText) ?? 0;
+  return minutes > 0 || seconds > 0 || calories > 0 || intensity > 0;
+}
+
+function isValidReading(event: ReadingEvent) {
+  const total =
+    event.pages ?? (event.fictionPages ?? 0) + (event.nonfictionPages ?? 0);
+  return (total ?? 0) > 0 || !!event.title;
+}
+
+function isValidDrinking(drinks: number) {
+  return drinks > 0;
+}
+
 export default function DailyLog({
   dateKey,
   userId,
@@ -331,12 +349,14 @@ export default function DailyLog({
     children,
     earned,
     hint,
+    score,
   }: {
     title: string;
     subtitle: string;
     children: React.ReactNode;
     earned: boolean;
     hint?: string;
+    score: number;
   }) => (
     <div
       className={[
@@ -350,17 +370,17 @@ export default function DailyLog({
           <div className="text-gray-400 mt-1">{subtitle}</div>
           {hint ? <div className="text-gray-500 mt-2 text-sm">{hint}</div> : null}
         </div>
-        <div
-          className={[
-            "shrink-0 w-10 h-10 rounded-md border flex items-center justify-center",
-            earned
-              ? "border-[color:var(--accent-60)] bg-[color:var(--accent-10)]"
-              : "border-white/10 bg-black/40",
-          ].join(" ")}
-          aria-label={earned ? "Earned" : "Not earned"}
-          title={earned ? "Earned" : "Not earned"}
-        >
-          {earned ? "✓" : ""}
+        <div className="shrink-0">
+          <div
+            className={[
+              "px-3 py-2 rounded-md border text-xs uppercase tracking-[0.3em] text-gray-300",
+              earned
+                ? "border-[color:var(--accent-60)] text-[color:var(--accent)] bg-[color:var(--accent-10)]"
+                : "border-white/10 bg-black/40",
+            ].join(" ")}
+          >
+            {Math.round(score)}/25
+          </div>
         </div>
       </div>
 
@@ -458,6 +478,7 @@ export default function DailyLog({
               totalWorkoutMinutes
             )}  •  Score: ${formatScore(scores.workoutScore)}/25`}
             earned={scores.workoutScore >= 25}
+            score={scores.workoutScore}
           >
             <div className="flex items-center gap-3">
               <button
@@ -560,42 +581,45 @@ export default function DailyLog({
                         const calories = exerciseCaloriesRef.current?.value ?? "";
                         const intensity = exerciseIntensityRef.current?.value ?? "";
                         const workoutId = id();
+                        const newWorkout: WorkoutActivity = {
+                          id: workoutId,
+                          type: exerciseType,
+                          minutesText: minutes,
+                          secondsText: seconds,
+                          caloriesText: calories,
+                          intensityText: intensity,
+                        };
                         setData((prev) => ({
                           ...prev,
                           workouts: {
                             ...prev.workouts,
                             activities: [
                               ...prev.workouts.activities,
-                              {
-                                id: workoutId,
-                                type: exerciseType,
-                                minutesText: minutes,
-                                secondsText: seconds,
-                                caloriesText: calories,
-                                intensityText: intensity,
-                              },
+                              newWorkout,
                             ],
                           },
                         }));
-                        const summaryParts = [
-                          exerciseType,
-                          minutes ? `${minutes} min` : undefined,
-                          intensity ? `Intensity ${intensity}` : undefined,
-                        ].filter(Boolean);
-                        await upsertFeedItem({
-                          user_id: userId,
-                          event_date: dateKey,
-                          event_type: "workout",
-                          event_id: workoutId,
-                          summary: summaryParts.join(" • "),
-                          metadata: {
-                            type: exerciseType,
-                            minutes,
-                            seconds,
-                            calories,
-                            intensity,
-                          },
-                        });
+                        if (isValidWorkout(newWorkout)) {
+                          const summaryParts = [
+                            exerciseType,
+                            minutes ? `${minutes} min` : undefined,
+                            intensity ? `Intensity ${intensity}` : undefined,
+                          ].filter(Boolean);
+                          await upsertFeedItem({
+                            user_id: userId,
+                            event_date: dateKey,
+                            event_type: "workout",
+                            event_id: workoutId,
+                            summary: summaryParts.join(" • "),
+                            metadata: {
+                              activityType: exerciseType,
+                              minutes,
+                              seconds,
+                              calories,
+                              intensity,
+                            },
+                          });
+                        }
                         if (exerciseMinutesRef.current) exerciseMinutesRef.current.value = "";
                         if (exerciseSecondsRef.current) exerciseSecondsRef.current.value = "";
                         if (exerciseCaloriesRef.current) exerciseCaloriesRef.current.value = "";
@@ -661,6 +685,7 @@ export default function DailyLog({
               scores.sleepScore
             )}/25`}
             earned={scores.sleepScore >= 25}
+            score={scores.sleepScore}
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -723,6 +748,7 @@ export default function DailyLog({
               scores.dietScore
             )}/25${scores.dietPenaltyTotal > 0 ? `  •  Alcohol penalty: -${scores.dietPenaltyTotal}` : ""}`}
             earned={scores.dietScore >= 25}
+            score={scores.dietScore}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -881,14 +907,18 @@ export default function DailyLog({
                                   event.id === updated.id ? updated : event
                                 )
                               );
-                              await updateFeedItemByEvent("drinking", updated.id, {
-                                summary: `Tier ${updated.tier} • ${updated.drinks} drinks`,
-                                metadata: {
-                                  tier: updated.tier,
-                                  drinks: updated.drinks,
-                                  note: updated.note,
-                                },
-                              });
+                              if (isValidDrinking(updated.drinks)) {
+                                await updateFeedItemByEvent("drinking", updated.id, {
+                                  summary: `Tier ${updated.tier} • ${updated.drinks} drinks`,
+                                  metadata: {
+                                    tier: updated.tier,
+                                    drinks: updated.drinks,
+                                    note: updated.note,
+                                  },
+                                });
+                              } else {
+                                await deleteFeedItemByEvent("drinking", updated.id);
+                              }
                               setDrinkingEditId(null);
                               setDrinkingOpen(false);
                             }
@@ -902,18 +932,20 @@ export default function DailyLog({
                             });
                             if (created) {
                               setDrinkingEvents((prev) => [...prev, created]);
-                              await upsertFeedItem({
-                                user_id: userId,
-                                event_date: dateKey,
-                                event_type: "drinking",
-                                event_id: created.id,
-                                summary: `Tier ${created.tier} • ${created.drinks} drinks`,
-                                metadata: {
-                                  tier: created.tier,
-                                  drinks: created.drinks,
-                                  note: created.note,
-                                },
-                              });
+                              if (isValidDrinking(created.drinks)) {
+                                await upsertFeedItem({
+                                  user_id: userId,
+                                  event_date: dateKey,
+                                  event_type: "drinking",
+                                  event_id: created.id,
+                                  summary: `Tier ${created.tier} • ${created.drinks} drinks`,
+                                  metadata: {
+                                    tier: created.tier,
+                                    drinks: created.drinks,
+                                    note: created.note,
+                                  },
+                                });
+                              }
                               if (drinkingDrinksRef.current)
                                 drinkingDrinksRef.current.value = "0";
                               if (drinkingNoteRef.current) drinkingNoteRef.current.value = "";
@@ -992,6 +1024,7 @@ export default function DailyLog({
               scores.readingScore
             )}/25`}
             earned={scores.readingScore >= 25}
+            score={scores.readingScore}
           >
             <div className="flex items-center gap-3">
               <button
@@ -1091,21 +1124,23 @@ export default function DailyLog({
                         const totalPages =
                           newEvent.pages ??
                           (newEvent.fictionPages ?? 0) + (newEvent.nonfictionPages ?? 0);
-                        await upsertFeedItem({
-                          user_id: userId,
-                          event_date: dateKey,
-                          event_type: "reading",
-                          event_id: newEventId,
-                          summary: `Read ${totalPages || 0} pages${
-                            newEvent.title ? ` • ${newEvent.title}` : ""
-                          }`,
-                          metadata: {
-                            pages: newEvent.pages,
-                            fiction_pages: newEvent.fictionPages,
-                            nonfiction_pages: newEvent.nonfictionPages,
-                            title: newEvent.title,
-                          },
-                        });
+                        if (isValidReading(newEvent)) {
+                          await upsertFeedItem({
+                            user_id: userId,
+                            event_date: dateKey,
+                            event_type: "reading",
+                            event_id: newEventId,
+                            summary: `Read ${totalPages || 0} pages${
+                              newEvent.title ? ` • ${newEvent.title}` : ""
+                            }`,
+                            metadata: {
+                              pages: newEvent.pages,
+                              fiction_pages: newEvent.fictionPages,
+                              nonfiction_pages: newEvent.nonfictionPages,
+                              title: newEvent.title,
+                            },
+                          });
+                        }
 
                         if (readingTitleRef.current) readingTitleRef.current.value = "";
                         if (readingPagesRef.current) readingPagesRef.current.value = "";

@@ -150,4 +150,9 @@ export type Comment = {
   feed_item_id: string;
   body: string;
   created_at: string;
+  profiles?: {
+    username?: string | null;
+    display_name?: string | null;
+    profile_photo_url?: string | null;
+  };
 };

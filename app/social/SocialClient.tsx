@@ -10,6 +10,8 @@ import { getProfile } from "@/lib/profile";
 import {
   addComment,
   backfillFeedItemsForUser,
+  deleteActivity,
+  deleteComment,
   getActivityDebug,
   getFeedActivityStream,
   getLikesForFeed,
@@ -22,6 +24,7 @@ import {
   unfollowUser,
 } from "@/lib/social";
 import type { Comment, Like, Profile, ActivityItem } from "@/lib/types";
+import ActivityPost from "@/app/components/social/ActivityPost";
 
 const TABS = ["Feed", "Search", "Profile"] as const;
 
@@ -43,7 +46,6 @@ export default function SocialClient() {
   const [likes, setLikes] = useState<Record<string, Like[]>>({});
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
-  const [commentBodies, setCommentBodies] = useState<Record<string, string>>({});
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Profile[]>([]);
@@ -171,137 +173,94 @@ export default function SocialClient() {
                         profile_photo_url: profile?.profile_photo_url ?? null,
                       }
                     : undefined);
+                const feedId = item.feed_item_id;
                 return (
-                <div key={`${item.user_id}-${item.event_type}-${item.event_id}`} className="command-surface rounded-md p-5 fade-up">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-800 border border-white/10 overflow-hidden">
-                      {profileInfo?.profile_photo_url ? (
-                        <img
-                          src={profileInfo.profile_photo_url}
-                          alt={profileInfo.display_name ?? profileInfo.username ?? "User"}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : null}
-                    </div>
-                    <div>
-                      <div className="text-white">
-                        {profileInfo?.display_name ?? profileInfo?.username ?? "User"}
-                      </div>
-                      <div className="text-gray-400 text-sm">@{profileInfo?.username ?? ""}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 text-white font-semibold">{item.summary}</div>
-                  <div className="text-gray-500 text-sm mt-1">
-                    {new Date(item.created_at).toLocaleString()}
-                  </div>
-
-                  {item.feed_item_id ? (
-                    <div className="mt-3 flex items-center gap-6 text-xs uppercase tracking-[0.2em] text-gray-500">
-                      <button
-                        onClick={async () => {
-                          if (!userId || !item.feed_item_id) return;
-                          const res = await toggleLike(
-                            item.feed_item_id,
-                            !!liked[item.feed_item_id],
-                            userId
-                          );
-                          if (res || res === false) {
-                            setLiked((prev) => ({
+                  <ActivityPost
+                    key={`${item.user_id}-${item.event_type}-${item.event_id}`}
+                    item={item}
+                    displayName={profileInfo?.display_name ?? "User"}
+                    username={profileInfo?.username ?? "user"}
+                    photoUrl={profileInfo?.profile_photo_url}
+                    liked={feedId ? !!liked[feedId] : false}
+                    likeCount={feedId ? likes[feedId]?.length ?? 0 : 0}
+                    commentCount={feedId ? comments[feedId]?.length ?? 0 : 0}
+                    comments={feedId ? comments[feedId] : []}
+                    currentUserId={userId}
+                    onToggleLike={async () => {
+                      if (!feedId) return;
+                      const res = await toggleLike(feedId, !!liked[feedId], userId);
+                      if (res || res === false) {
+                        setLiked((prev) => ({ ...prev, [feedId]: !prev[feedId] }));
+                        setLikes((prev) => {
+                          const current = prev[feedId] ?? [];
+                          if (liked[feedId]) {
+                            return {
                               ...prev,
-                              [item.feed_item_id as string]: !prev[item.feed_item_id as string],
-                            }));
-                            setLikes((prev) => {
-                              const current = prev[item.feed_item_id as string] ?? [];
-                              if (liked[item.feed_item_id as string]) {
-                                return {
-                                  ...prev,
-                                  [item.feed_item_id as string]: current.filter(
-                                    (like) => like.user_id !== userId
-                                  ),
-                                };
-                              }
-                              return {
-                                ...prev,
-                                [item.feed_item_id as string]: [
-                                  ...current,
-                                  { user_id: userId, feed_item_id: item.feed_item_id as string },
-                                ],
-                              };
-                            });
+                              [feedId]: current.filter((like) => like.user_id !== userId),
+                            };
                           }
-                        }}
-                        className="hover:text-white"
-                      >
-                        {liked[item.feed_item_id] ? "Unlike" : "Like"} •{" "}
-                        {likes[item.feed_item_id]?.length ?? 0}
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!item.feed_item_id) return;
-                          const existing = comments[item.feed_item_id];
-                          if (existing) return;
-                          const list = await listComments(item.feed_item_id);
-                          setComments((prev) => ({ ...prev, [item.feed_item_id as string]: list }));
-                        }}
-                        className="hover:text-white"
-                      >
-                        Comments • {comments[item.feed_item_id]?.length ?? 0}
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {item.feed_item_id && comments[item.feed_item_id] ? (
-                    <div className="mt-4 space-y-2">
-                      {comments[item.feed_item_id].map((comment) => (
-                        <div
-                          key={comment.id}
-                          className="text-sm text-gray-300 flex items-center justify-between"
-                        >
-                          <span>{comment.body}</span>
-                        </div>
-                      ))}
-                      <div className="flex gap-2">
-                        <input
-                          value={commentBodies[item.feed_item_id] ?? ""}
-                          onChange={(e) =>
-                            setCommentBodies((prev) => ({
-                              ...prev,
-                              [item.feed_item_id as string]: e.target.value,
-                            }))
-                          }
-                          className="flex-1 px-3 py-2 rounded-md bg-black/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/10"
-                          placeholder="Add a comment"
-                        />
-                        <button
-                          onClick={async () => {
-                            if (!userId || !item.feed_item_id) return;
-                            const body = commentBodies[item.feed_item_id]?.trim();
-                            if (!body) return;
-                            const created = await addComment(item.feed_item_id, body, userId);
-                            if (created) {
-                              setComments((prev) => ({
-                                ...prev,
-                                [item.feed_item_id as string]: [
-                                  ...(prev[item.feed_item_id as string] ?? []),
-                                  created,
-                                ],
-                              }));
-                              setCommentBodies((prev) => ({
-                                ...prev,
-                                [item.feed_item_id as string]: "",
-                              }));
-                            }
-                          }}
-                          className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20"
-                        >
-                          Send
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              )})
+                          return {
+                            ...prev,
+                            [feedId]: [...current, { user_id: userId, feed_item_id: feedId }],
+                          };
+                        });
+                      }
+                    }}
+                    onLoadComments={async () => {
+                      if (!feedId) return;
+                      const existing = comments[feedId];
+                      if (existing) return;
+                      const list = await listComments(feedId);
+                      setComments((prev) => ({ ...prev, [feedId]: list }));
+                    }}
+                    onAddComment={async (body) => {
+                      if (!feedId) return;
+                      const created = await addComment(feedId, body, userId);
+                      if (created) {
+                        setComments((prev) => ({
+                          ...prev,
+                          [feedId]: [...(prev[feedId] ?? []), created],
+                        }));
+                      }
+                    }}
+                    onDeleteComment={async (comment) => {
+                      if (!feedId) return;
+                      const ok = await deleteComment(comment.id);
+                      if (ok) {
+                        setComments((prev) => ({
+                          ...prev,
+                          [feedId]: (prev[feedId] ?? []).filter((c) => c.id !== comment.id),
+                        }));
+                      }
+                    }}
+                    onDeletePost={async () => {
+                      const res = await deleteActivity(userId, item);
+                      if (res.ok) {
+                        setActivityItems((prev) =>
+                          prev.filter(
+                            (it) =>
+                              !(
+                                it.user_id === item.user_id &&
+                                it.event_type === item.event_type &&
+                                it.event_id === item.event_id
+                              )
+                          )
+                        );
+                        setSelfItems((prev) =>
+                          prev.filter(
+                            (it) =>
+                              !(
+                                it.user_id === item.user_id &&
+                                it.event_type === item.event_type &&
+                                it.event_id === item.event_id
+                              )
+                          )
+                        );
+                      }
+                    }}
+                  />
+                );
+              })
             )}
             {(process.env.NODE_ENV !== "production" ||
               searchParams.get("debug") === "1") && debugInfo ? (
@@ -340,12 +299,10 @@ export default function SocialClient() {
                 Results
               </div>
               <div className="mt-4 divide-y divide-white/10">
-                {!query.trim() ? (
-                  <div className="text-gray-500 py-6">Start typing to search users.</div>
-                ) : loadingResults ? (
+                {!query.trim() ? null : loadingResults ? (
                   <div className="text-gray-500">Searching…</div>
                 ) : results.length === 0 ? (
-                  <div className="text-gray-500 py-6">No users found.</div>
+                  <div className="text-gray-500 py-6">No results.</div>
                 ) : (
                   results.map((result) => (
                     <div
@@ -453,17 +410,100 @@ export default function SocialClient() {
                   {selfItems.length === 0 ? (
                     <div className="text-gray-500">No activity yet.</div>
                   ) : (
-                    selfItems.map((item) => (
-                        <div
+                    selfItems.map((item) => {
+                      const feedId = item.feed_item_id;
+                      return (
+                        <ActivityPost
                           key={`${item.user_id}-${item.event_type}-${item.event_id}`}
-                          className="rounded-md border border-white/10 bg-black/40 px-4 py-3"
-                        >
-                          <div className="text-white font-semibold">{item.summary}</div>
-                          <div className="text-gray-500 text-sm mt-1">
-                            {new Date(item.created_at).toLocaleString()}
-                          </div>
-                        </div>
-                      ))
+                          item={item}
+                          displayName={displayName || "You"}
+                          username={profile?.username ?? "you"}
+                          photoUrl={profile?.profile_photo_url}
+                          liked={feedId ? !!liked[feedId] : false}
+                          likeCount={feedId ? likes[feedId]?.length ?? 0 : 0}
+                          commentCount={feedId ? comments[feedId]?.length ?? 0 : 0}
+                          comments={feedId ? comments[feedId] : []}
+                          currentUserId={userId}
+                          onToggleLike={async () => {
+                            if (!feedId) return;
+                            const res = await toggleLike(feedId, !!liked[feedId], userId);
+                            if (res || res === false) {
+                              setLiked((prev) => ({ ...prev, [feedId]: !prev[feedId] }));
+                              setLikes((prev) => {
+                                const current = prev[feedId] ?? [];
+                                if (liked[feedId]) {
+                                  return {
+                                    ...prev,
+                                    [feedId]: current.filter(
+                                      (like) => like.user_id !== userId
+                                    ),
+                                  };
+                                }
+                                return {
+                                  ...prev,
+                                  [feedId]: [
+                                    ...current,
+                                    { user_id: userId, feed_item_id: feedId },
+                                  ],
+                                };
+                              });
+                            }
+                          }}
+                          onLoadComments={async () => {
+                            if (!feedId) return;
+                            const existing = comments[feedId];
+                            if (existing) return;
+                            const list = await listComments(feedId);
+                            setComments((prev) => ({ ...prev, [feedId]: list }));
+                          }}
+                          onAddComment={async (body) => {
+                            if (!feedId) return;
+                            const created = await addComment(feedId, body, userId);
+                            if (created) {
+                              setComments((prev) => ({
+                                ...prev,
+                                [feedId]: [...(prev[feedId] ?? []), created],
+                              }));
+                            }
+                          }}
+                          onDeleteComment={async (comment) => {
+                            if (!feedId) return;
+                            const ok = await deleteComment(comment.id);
+                            if (ok) {
+                              setComments((prev) => ({
+                                ...prev,
+                                [feedId]: (prev[feedId] ?? []).filter((c) => c.id !== comment.id),
+                              }));
+                            }
+                          }}
+                          onDeletePost={async () => {
+                            const res = await deleteActivity(userId, item);
+                            if (res.ok) {
+                              setSelfItems((prev) =>
+                                prev.filter(
+                                  (it) =>
+                                    !(
+                                      it.user_id === item.user_id &&
+                                      it.event_type === item.event_type &&
+                                      it.event_id === item.event_id
+                                    )
+                                )
+                              );
+                              setActivityItems((prev) =>
+                                prev.filter(
+                                  (it) =>
+                                    !(
+                                      it.user_id === item.user_id &&
+                                      it.event_type === item.event_type &&
+                                      it.event_id === item.event_id
+                                    )
+                                )
+                              );
+                            }
+                          }}
+                        />
+                      );
+                    })
                   )}
                 </div>
               </div>
