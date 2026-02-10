@@ -19,7 +19,7 @@ export default function StoryLoading({ name }: { name?: string }) {
   }, []);
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+    <main className="min-h-screen text-white flex items-center justify-center p-8">
       <div className="w-full max-w-3xl">
         <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
         <h1 className="mt-4 text-4xl md:text-6xl font-semibold leading-tight">

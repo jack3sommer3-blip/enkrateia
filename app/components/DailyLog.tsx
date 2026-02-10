@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, forwardRef } from "react";
-import Nav from "@/app/components/Nav";
 import { supabase } from "@/lib/supabase";
 import {
   DayData,
@@ -334,8 +333,8 @@ export default function DailyLog({
   }) => (
     <div
       className={[
-        "p-6 rounded-2xl border transition",
-        earned ? "bg-emerald-950 border-emerald-700" : "bg-gray-900 border-gray-800",
+        "p-6 rounded-md border transition command-surface",
+        earned ? "border-emerald-500/40 bg-emerald-500/5" : "",
       ].join(" ")}
     >
       <div className="flex items-start justify-between gap-4">
@@ -346,8 +345,8 @@ export default function DailyLog({
         </div>
         <div
           className={[
-            "shrink-0 w-10 h-10 rounded-full border flex items-center justify-center",
-            earned ? "border-emerald-500 bg-emerald-900" : "border-gray-700 bg-black",
+            "shrink-0 w-10 h-10 rounded-md border flex items-center justify-center",
+            earned ? "border-emerald-500/60 bg-emerald-500/10" : "border-white/10 bg-black/40",
           ].join(" ")}
           aria-label={earned ? "Earned" : "Not earned"}
           title={earned ? "Earned" : "Not earned"}
@@ -371,8 +370,8 @@ export default function DailyLog({
         ref={ref}
         type={props.type ?? "text"}
         className={[
-          "w-full px-3 py-2 rounded-xl bg-black border border-gray-700",
-          "focus:outline-none focus:ring-2 focus:ring-gray-600",
+          "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
+          "focus:outline-none focus:ring-2 focus:ring-white/10",
           props.className ?? "",
         ].join(" ")}
       />
@@ -384,8 +383,8 @@ export default function DailyLog({
     <textarea
       {...props}
       className={[
-        "w-full px-3 py-2 rounded-xl bg-black border border-gray-700",
-        "focus:outline-none focus:ring-2 focus:ring-gray-600",
+        "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
+        "focus:outline-none focus:ring-2 focus:ring-white/10",
         props.className ?? "",
       ].join(" ")}
     />
@@ -395,51 +394,52 @@ export default function DailyLog({
     <select
       {...props}
       className={[
-        "w-full px-3 py-2 rounded-xl bg-black border border-gray-700",
-        "focus:outline-none focus:ring-2 focus:ring-gray-600",
+        "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
+        "focus:outline-none focus:ring-2 focus:ring-white/10",
         props.className ?? "",
       ].join(" ")}
     />
   );
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
+    <main className="min-h-screen text-white flex flex-col items-center p-8">
       <div className="w-full max-w-4xl">
-        <header className="mb-10 flex items-center justify-between">
+        <header className="mb-10">
           <div className="flex flex-col gap-3">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
+            <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
+              Daily Log
+            </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-wide leading-none">
               {title ?? "Daily Log"}
             </h1>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <div className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800">
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+              <div className="px-4 py-2 rounded-md command-surface">
                 <span className="text-gray-400">Score</span>{" "}
                 <span className="font-semibold">{formatScore(scores.totalScore)}/100</span>
               </div>
 
-              <div className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800">
+              <div className="px-4 py-2 rounded-md command-surface">
                 <span className="text-gray-400">Full points</span>{" "}
                 <span className="font-semibold">{completedCount}/4</span>
               </div>
 
-              <div className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-400">
+              <div className="px-4 py-2 rounded-md command-surface text-gray-400">
                 {dateKey}
               </div>
 
-              <div className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-400 min-w-[160px] text-center">
+              <div className="px-4 py-2 rounded-md command-surface text-gray-400 min-w-[160px] text-center">
                 Auto-save on
               </div>
             </div>
             <div className="min-h-[40px]">
               {saveError ? (
-                <div className="px-4 py-2 rounded-xl bg-rose-950 border border-rose-800 text-rose-200 text-sm">
+                <div className="px-4 py-2 rounded-md bg-rose-950/40 border border-rose-800/60 text-rose-200 text-sm">
                   {saveError}
                 </div>
               ) : null}
             </div>
           </div>
-          <Nav className="justify-end" />
         </header>
 
         <div key={formKey} className="grid grid-cols-1 gap-6">
@@ -454,7 +454,7 @@ export default function DailyLog({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setExerciseOpen(true)}
-                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                className="px-4 py-2 rounded-md border border-white/10 bg-slate-900 hover:border-white/20 transition"
               >
                 Add workout
               </button>
@@ -483,7 +483,7 @@ export default function DailyLog({
 
             {exerciseOpen ? (
               <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
-                <div className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
+                <div className="w-full max-w-3xl rounded-md border border-white/10 command-surface-elevated p-6">
                   <div className="flex items-center justify-between">
                     <div className="text-xl font-semibold">Add workout</div>
                     <button
@@ -595,13 +595,13 @@ export default function DailyLog({
                           exerciseIntensityRef.current.value = "";
                         setExerciseOpen(false);
                       }}
-                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                      className="px-4 py-2 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition"
                     >
                       Save workout
                     </button>
                     <button
                       onClick={() => setExerciseOpen(false)}
-                      className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                      className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 transition"
                     >
                       Cancel
                     </button>
@@ -619,7 +619,7 @@ export default function DailyLog({
                 {data.workouts.activities.map((a) => (
                   <div
                     key={a.id}
-                    className="p-4 rounded-2xl bg-black border border-gray-800 flex items-center justify-between"
+                    className="p-4 rounded-md bg-black/40 border border-white/10 flex items-center justify-between"
                   >
                     <div className="text-gray-200">
                       <div className="font-semibold">{a.type}</div>
@@ -636,7 +636,7 @@ export default function DailyLog({
                         removeActivity(a.id);
                         await deleteFeedItemByEvent("workout", a.id);
                       }}
-                      className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition text-sm"
+                      className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 transition text-sm"
                     >
                       Remove
                     </button>
@@ -786,23 +786,23 @@ export default function DailyLog({
               </div>
             </div>
 
-            <div className="mt-6 p-4 rounded-2xl border border-gray-800 bg-black">
+            <div className="mt-6 p-4 rounded-md border border-white/10 bg-black/40">
               <div className="flex items-center justify-between">
                 <div className="text-lg font-semibold">Drinking</div>
                 <button
                   onClick={() => setDrinkingOpen((prev) => !prev)}
-                  className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition text-sm"
+                  className="px-3 py-2 rounded-md border border-white/10 bg-slate-900 hover:border-white/20 transition text-sm"
                 >
                   {drinkingOpen ? "Close" : "Add drinking event"}
                 </button>
               </div>
 
-              {drinkingOpen ? (
-                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
-                  <div className="w-full max-w-2xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xl font-semibold">
-                        {drinkingEditId ? "Edit drinking event" : "Add drinking event"}
+            {drinkingOpen ? (
+              <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
+                <div className="w-full max-w-2xl rounded-md border border-white/10 command-surface-elevated p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xl font-semibold">
+                      {drinkingEditId ? "Edit drinking event" : "Add drinking event"}
                       </div>
                       <button
                         onClick={() => {
@@ -913,7 +913,7 @@ export default function DailyLog({
                             }
                           }
                         }}
-                        className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                        className="px-4 py-2 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition"
                       >
                         {drinkingEditId ? "Save changes" : "Save drinking event"}
                       </button>
@@ -922,7 +922,7 @@ export default function DailyLog({
                           setDrinkingOpen(false);
                           setDrinkingEditId(null);
                         }}
-                        className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                        className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 transition"
                       >
                         Cancel
                       </button>
@@ -939,7 +939,7 @@ export default function DailyLog({
                   drinkingEvents.map((event) => (
                     <div
                       key={event.id}
-                      className="flex items-center justify-between rounded-xl border border-gray-800 bg-gray-900 px-4 py-2 text-sm"
+                      className="flex items-center justify-between rounded-md border border-white/10 bg-black/40 px-4 py-2 text-sm"
                     >
                       <div className="text-gray-200">
                         Tier {event.tier} • {event.drinks} drinks
@@ -988,7 +988,7 @@ export default function DailyLog({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setReadingOpen(true)}
-                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                className="px-4 py-2 rounded-md border border-white/10 bg-slate-900 hover:border-white/20 transition"
               >
                 Add reading event
               </button>
@@ -996,7 +996,7 @@ export default function DailyLog({
 
             {readingOpen ? (
               <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
-                <div className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
+                <div className="w-full max-w-3xl rounded-md border border-white/10 command-surface-elevated p-6">
                   <div className="flex items-center justify-between">
                     <div className="text-xl font-semibold">Add reading event</div>
                     <button
@@ -1046,7 +1046,7 @@ export default function DailyLog({
                         rows={4}
                         placeholder="Quick thoughts, what you learned, what you’ll apply…"
                         ref={readingNoteRef}
-                        className="w-full px-3 py-2 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+                        className="w-full px-3 py-2 rounded-md bg-black/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/10"
                       />
                     </div>
                   </div>
@@ -1109,13 +1109,13 @@ export default function DailyLog({
 
                         setReadingOpen(false);
                       }}
-                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                      className="px-4 py-2 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition"
                     >
                       Save reading event
                     </button>
                     <button
                       onClick={() => setReadingOpen(false)}
-                      className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                      className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 transition"
                     >
                       Cancel
                     </button>
@@ -1131,7 +1131,7 @@ export default function DailyLog({
                 readingEvents.map((event) => (
                   <div
                     key={event.id}
-                    className="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3 text-sm"
+                    className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-sm"
                   >
                     <div className="text-gray-200 font-semibold">
                       {event.title || "Reading"}

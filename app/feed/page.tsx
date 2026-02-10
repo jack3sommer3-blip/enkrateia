@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import {
@@ -58,22 +57,23 @@ export default function FeedPage() {
   if (loading) return <StoryLoading />;
   if (!userId) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+      <main className="min-h-screen text-white flex items-center justify-center p-8">
         <div className="text-gray-400">Please sign in to view your feed.</div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-5xl">
-        <header className="mb-10 flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">Feed</h1>
-            <p className="text-gray-400">Recent activity from people you follow.</p>
+    <main className="min-h-screen text-white flex flex-col items-center p-8">
+      <div className="w-full max-w-5xl pt-10">
+        <header className="mb-10">
+          <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
+            Intelligence Briefing
           </div>
-          <Nav className="justify-end" />
+          <h1 className="mt-3 text-4xl md:text-5xl font-bold leading-tight">Feed</h1>
+          <p className="mt-2 text-sm text-gray-400">
+            Recent activity from people you follow.
+          </p>
         </header>
 
         <section className="space-y-4">
@@ -83,7 +83,7 @@ export default function FeedPage() {
             feed.map((item) => (
               <div
                 key={item.id}
-                className="p-5 rounded-2xl border border-gray-800 bg-gray-900"
+                className="command-surface rounded-md p-5 fade-up"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gray-800 border border-gray-700 overflow-hidden">
@@ -110,7 +110,7 @@ export default function FeedPage() {
                   {new Date(item.created_at).toLocaleString()}
                 </div>
 
-                <div className="mt-3 flex items-center gap-4 text-sm text-gray-400">
+                <div className="mt-3 flex items-center gap-6 text-xs uppercase tracking-[0.2em] text-gray-500">
                   <button
                     onClick={async () => {
                       if (!userId) return;
@@ -185,7 +185,7 @@ export default function FeedPage() {
                             [item.id]: e.target.value,
                           }))
                         }
-                        className="flex-1 px-3 py-2 rounded-xl bg-black border border-gray-700"
+                        className="flex-1 px-3 py-2 rounded-md bg-black border border-gray-700"
                         placeholder="Add a comment"
                       />
                       <button
@@ -202,7 +202,7 @@ export default function FeedPage() {
                             setCommentBodies((prev) => ({ ...prev, [item.id]: "" }));
                           }
                         }}
-                        className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700"
+                        className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
                       >
                         Send
                       </button>

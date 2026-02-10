@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import TopNav from "@/app/components/layout/TopNav";
+import SystemTime from "@/app/components/layout/SystemTime";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +29,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <div className="command-grid">
+          <TopNav />
+          {children}
+          <footer className="mx-auto max-w-6xl px-6 py-8 text-xs text-gray-500">
+            System Time: <SystemTime />
+          </footer>
+        </div>
       </body>
     </html>
   );

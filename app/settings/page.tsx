@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
@@ -115,26 +114,23 @@ export default function SettingsPage() {
   if (!userId || !profile) return null;
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-4xl">
-        <header className="mb-10 flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-              Settings
-            </h1>
-            <p className="text-gray-400">
-              Private account settings and public profile edits.
-            </p>
-          </div>
-          <Nav className="justify-end" />
+    <main className="min-h-screen text-white flex flex-col items-center p-8">
+      <div className="w-full max-w-4xl pt-10">
+        <header className="mb-10">
+          <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Settings</div>
+          <h1 className="mt-3 text-4xl md:text-5xl font-bold leading-tight">
+            Profile Controls
+          </h1>
+          <p className="mt-2 text-sm text-gray-400">
+            Private account settings and public profile edits.
+          </p>
         </header>
 
-        <section className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
+        <section className="command-surface rounded-md p-6">
           <div className="mb-6 flex items-center gap-3">
             <a
               href="/goals"
-              className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+              className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
             >
               Edit goals
             </a>
@@ -148,7 +144,7 @@ export default function SettingsPage() {
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+                className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
                 placeholder="your_username"
               />
             </div>
@@ -158,7 +154,7 @@ export default function SettingsPage() {
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+                className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
                 placeholder="Your name"
               />
             </div>
@@ -169,7 +165,7 @@ export default function SettingsPage() {
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={4}
-                className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+                className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
                 placeholder="Short bio"
               />
             </div>
@@ -198,7 +194,7 @@ export default function SettingsPage() {
                   });
                   reader.readAsDataURL(file);
                 }}
-                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"
+                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"
               />
             </div>
 
@@ -248,7 +244,7 @@ export default function SettingsPage() {
               <input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+                className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
                 placeholder="City, Country"
               />
             </div>
@@ -260,7 +256,7 @@ export default function SettingsPage() {
             <button
               onClick={saveProfile}
               disabled={saving}
-              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition disabled:opacity-50"
+              className="px-4 py-2 rounded-md border border-emerald-500/60 text-emerald-300 hover:text-white hover:border-emerald-400 transition disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save changes"}
             </button>
@@ -271,7 +267,7 @@ export default function SettingsPage() {
 
       {cropOpen && imageSrc ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
+          <div className="w-full max-w-3xl rounded-md border border-gray-800 bg-gray-950 p-6 command-surface-elevated">
             <div className="flex items-center justify-between">
               <div className="text-xl font-semibold">Crop profile photo</div>
               <button
@@ -285,7 +281,7 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="mt-4 relative h-[360px] w-full bg-black rounded-2xl overflow-hidden">
+            <div className="mt-4 relative h-[360px] w-full bg-black rounded-md overflow-hidden">
               <Cropper
                 image={imageSrc}
                 crop={crop}
@@ -336,7 +332,7 @@ export default function SettingsPage() {
                     setError(err?.message ?? "Failed to crop image");
                   }
                 }}
-                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                className="px-4 py-2 rounded-md border border-emerald-500/60 text-emerald-300 hover:text-white hover:border-emerald-400 transition"
               >
                 Save photo
               </button>
@@ -345,7 +341,7 @@ export default function SettingsPage() {
                   setCropOpen(false);
                   setImageSrc(null);
                 }}
-                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
               >
                 Cancel
               </button>

@@ -1,28 +1,58 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0a0f1a;
+  --surface: #0f1726;
+  --surface-elevated: #121c2e;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e5e7eb;
+  --text-muted: #94a3b8;
+  --accent: #22c55e;
+  --accent-blue: #38bdf8;
+  --danger: #ef4444;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+main {
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(56, 189, 248, 0.06), transparent 60%),
+    radial-gradient(800px 400px at 90% -10%, rgba(34, 197, 94, 0.05), transparent 60%),
+    var(--bg);
+}
+
+.command-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.command-surface-elevated {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.command-grid::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 80px 80px, 80px 80px;
+  opacity: 0.04;
 }
 
 @keyframes load {
@@ -35,4 +65,19 @@ body {
   100% {
     transform: translateX(220%);
   }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fadeUp 0.4s ease forwards;
 }

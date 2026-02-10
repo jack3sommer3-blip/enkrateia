@@ -56,7 +56,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+    <main className="min-h-screen text-white flex items-center justify-center p-8">
       <div className="w-full max-w-md">
         <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
         <h1 className="text-4xl font-semibold mt-4">
@@ -68,7 +68,7 @@ export default function LoginPage() {
 
         <button
           onClick={signInWithGoogle}
-          className="mt-6 w-full px-4 py-3 rounded-xl bg-white text-black font-semibold hover:bg-gray-100 transition"
+          className="mt-6 w-full px-4 py-3 rounded-md border border-white/10 bg-white text-black font-semibold hover:bg-gray-100 transition"
         >
           Continue with Google
         </button>
@@ -81,14 +81,14 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             type="email"
-            className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+            className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
           />
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             type="password"
-            className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+            className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
           />
         </div>
 
@@ -100,7 +100,7 @@ export default function LoginPage() {
         <button
           onClick={handleEmailAuth}
           disabled={loading}
-          className="mt-5 w-full px-4 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition disabled:opacity-50"
+          className="mt-5 w-full px-4 py-3 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition disabled:opacity-50"
         >
           {loading
             ? "Working…"

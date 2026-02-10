@@ -1,20 +1,17 @@
 "use client";
 
-import Nav from "@/app/components/Nav";
-
 export default function MissionPage() {
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-3xl">
-        <header className="mb-10 flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">Mission</h1>
-          </div>
-          <Nav className="justify-end" />
+    <main className="min-h-screen text-white flex flex-col items-center p-8">
+      <div className="w-full max-w-3xl pt-10">
+        <header className="mb-10">
+          <div className="text-gray-500 text-xs tracking-[0.4em]">MISSION</div>
+          <h1 className="mt-3 text-4xl md:text-6xl font-bold leading-tight">
+            Enkrateia
+          </h1>
         </header>
 
-        <section className="space-y-8 text-lg leading-relaxed text-gray-200">
+        <section className="space-y-10 text-base md:text-lg leading-relaxed text-gray-200">
           <div className="space-y-4">
             <p className="text-2xl md:text-3xl font-semibold text-white">
               Welcome to Enkrateia.
@@ -26,7 +23,7 @@ export default function MissionPage() {
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900/60">
+          <div className="command-surface rounded-md p-6">
             <p className="text-xl md:text-2xl font-semibold text-white whitespace-pre-line">
               What is measured is confronted.
               {"\n"}
@@ -39,7 +36,7 @@ export default function MissionPage() {
             <div>@jack</div>
           </div>
 
-          <div className="pt-4 border-t border-gray-800">
+          <div className="pt-4 border-t border-white/10">
             <div className="text-sm uppercase tracking-[0.2em] text-gray-500">
               Foundations
             </div>

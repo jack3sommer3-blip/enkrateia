@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
+import Tabs from "@/app/components/ui/Tabs";
 import {
   getUserFeed,
   listFollowers,
@@ -34,7 +34,7 @@ export default function PublicProfilePage() {
   const { loading: sessionLoading, userId } = useSession();
   const [profile, setProfile] = useState<Profile | undefined>();
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"activity" | "badges">("activity");
+  const [tab, setTab] = useState<"Activity" | "Badges">("Activity");
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [followers, setFollowers] = useState<any[]>([]);
   const [following, setFollowing] = useState<any[]>([]);
@@ -91,7 +91,7 @@ export default function PublicProfilePage() {
 
   if (!profile) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+      <main className="min-h-screen text-white flex items-center justify-center p-8">
         <div className="text-gray-400">Profile not found.</div>
       </main>
     );
@@ -99,7 +99,7 @@ export default function PublicProfilePage() {
 
   if (!profile.is_public && profile.id !== userId) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+      <main className="min-h-screen text-white flex items-center justify-center p-8">
         <div className="text-gray-400">This profile is private.</div>
       </main>
     );
@@ -108,39 +108,35 @@ export default function PublicProfilePage() {
   const displayName = profile.display_name || `${profile.first_name} ${profile.last_name}`;
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-5xl">
-        <header className="mb-10">
-          <div className="flex items-center justify-between">
+    <main className="min-h-screen text-white flex flex-col items-center p-8">
+      <div className="w-full max-w-5xl pt-10">
+        <header className="mb-10 flex flex-col gap-6">
+          <div className="flex items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-2xl font-semibold">
+              <div className="h-20 w-20 rounded-full border border-white/10 bg-slate-800 flex items-center justify-center text-2xl font-semibold overflow-hidden">
                 {profile.profile_photo_url ? (
                   <img
                     src={profile.profile_photo_url}
                     alt={displayName}
-                    className="w-full h-full object-cover rounded-full"
+                    className="h-full w-full object-cover rounded-full"
                   />
                 ) : (
                   initials(profile)
                 )}
               </div>
               <div>
-                <div className="text-3xl font-semibold flex items-center gap-2">
+                <div className="text-3xl md:text-4xl font-semibold flex items-center gap-2">
                   {displayName}
-                  <span className="text-gray-500 text-sm">
-                    {profile.location ? `• ${profile.location}` : ""}
-                  </span>
+                  {profile.location ? (
+                    <span className="text-gray-500 text-sm">• {profile.location}</span>
+                  ) : null}
                 </div>
-                <div className="text-gray-400 flex items-center gap-3">
+                <div className="text-gray-400 flex flex-wrap items-center gap-3 text-sm">
                   <span>@{profile.username}</span>
                   <span className="text-gray-600">•</span>
-                  <span className="text-gray-300">
-                    {followers.length} Followers
-                  </span>
+                  <span className="text-gray-300">{followers.length} Followers</span>
                   <span className="text-gray-600">•</span>
-                  <span className="text-gray-300">
-                    {following.length} Following
-                  </span>
+                  <span className="text-gray-300">{following.length} Following</span>
                 </div>
               </div>
             </div>
@@ -156,63 +152,42 @@ export default function PublicProfilePage() {
                     if (res) setIsFollowing(true);
                   }
                 }}
-                className="px-4 py-2 rounded-full bg-emerald-700 hover:bg-emerald-600 transition"
+                className="px-4 py-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 transition"
               >
                 {isFollowing ? "Unfollow" : "Follow"}
               </button>
             ) : (
               <Link
                 href="/"
-                className="px-4 py-2 rounded-full bg-gray-800 hover:bg-gray-700 transition"
+                className="px-4 py-2 rounded-md border border-white/10 bg-slate-900 text-gray-200 hover:border-white/20 transition"
               >
                 Back to app
               </Link>
             )}
           </div>
-
-          <div className="mt-6 flex items-center justify-between">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <Nav className="justify-end" />
-          </div>
         </header>
 
         {profile.bio ? (
-          <section className="p-6 rounded-2xl border border-gray-800 bg-gray-900 text-gray-200">
+          <section className="command-surface rounded-md p-6 text-gray-200">
             {profile.bio}
           </section>
         ) : (
-          <section className="p-6 rounded-2xl border border-gray-800 bg-gray-900 text-gray-500">
+          <section className="command-surface rounded-md p-6 text-gray-500">
             No bio yet.
           </section>
         )}
 
-        <section className="mt-8 flex flex-wrap gap-2">
-          {["activity", "badges"].map((item) => (
-            <button
-              key={item}
-              onClick={() => setTab(item as typeof tab)}
-              className={[
-                "px-4 py-2 rounded-xl border transition",
-                tab === item
-                  ? "bg-emerald-950 border-emerald-700 text-white"
-                  : "bg-gray-900 border-gray-800 text-gray-300 hover:text-white",
-              ].join(" ")}
-            >
-              {item[0].toUpperCase() + item.slice(1)}
-            </button>
-          ))}
+        <section className="mt-8">
+          <Tabs tabs={["Activity", "Badges"]} active={tab} onChange={(value) => setTab(value as typeof tab)} />
         </section>
 
-        {tab === "activity" ? (
+        {tab === "Activity" ? (
           <section className="mt-6 space-y-4">
             {feedItems.length === 0 ? (
               <div className="text-gray-500">No activity yet.</div>
             ) : (
               feedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-5 rounded-2xl border border-gray-800 bg-gray-900"
-                >
+                <div key={item.id} className="command-surface rounded-md p-5 fade-up">
                   <div className="text-gray-400 text-sm">{item.event_type}</div>
                   <div className="text-white font-semibold mt-1">{item.summary}</div>
                   <div className="text-gray-500 text-sm mt-1">
@@ -243,11 +218,11 @@ export default function PublicProfilePage() {
                           });
                         }
                       }}
-                      className="hover:text-white"
-                    >
-                      {liked[item.id] ? "Unlike" : "Like"} •{" "}
-                      {likes[item.id]?.length ?? 0}
-                    </button>
+                    className="hover:text-white"
+                  >
+                    {liked[item.id] ? "Unlike" : "Like"} •{" "}
+                    {likes[item.id]?.length ?? 0}
+                  </button>
                     <button
                       onClick={async () => {
                         const existing = comments[item.id];
@@ -255,14 +230,14 @@ export default function PublicProfilePage() {
                         const list = await listComments(item.id);
                         setComments((prev) => ({ ...prev, [item.id]: list }));
                       }}
-                      className="hover:text-white"
-                    >
-                      Comments • {comments[item.id]?.length ?? 0}
-                    </button>
-                  </div>
-                  {comments[item.id] ? (
-                    <div className="mt-4 space-y-2">
-                      {comments[item.id].map((comment) => (
+                    className="hover:text-white"
+                  >
+                    Comments • {comments[item.id]?.length ?? 0}
+                  </button>
+                </div>
+                {comments[item.id] ? (
+                  <div className="mt-4 space-y-2">
+                    {comments[item.id].map((comment) => (
                         <div
                           key={comment.id}
                           className="text-sm text-gray-300 flex items-center justify-between"
@@ -297,7 +272,7 @@ export default function PublicProfilePage() {
                               [item.id]: e.target.value,
                             }))
                           }
-                          className="flex-1 px-3 py-2 rounded-xl bg-black border border-gray-700"
+                          className="flex-1 px-3 py-2 rounded-md bg-black border border-gray-700"
                           placeholder="Add a comment"
                         />
                         <button
@@ -314,7 +289,7 @@ export default function PublicProfilePage() {
                               setCommentBodies((prev) => ({ ...prev, [item.id]: "" }));
                             }
                           }}
-                          className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700"
+                          className="px-3 py-2 rounded-md bg-slate-900 border border-white/10 hover:border-white/20"
                         >
                           Send
                         </button>
@@ -327,7 +302,7 @@ export default function PublicProfilePage() {
           </section>
         ) : null}
 
-        {tab === "badges" ? (
+        {tab === "Badges" ? (
           <section className="mt-6 text-gray-500">Badges coming soon.</section>
         ) : null}
       </div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { getProfile } from "@/lib/profile";
@@ -36,8 +35,8 @@ export default function ProfilePage() {
   if (!userId || !profile) return null;
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-5xl">
+    <main className="min-h-screen text-white flex flex-col items-center p-8">
+      <div className="w-full max-w-5xl pt-10">
         <header className="mb-10 flex items-center justify-between">
           <div className="flex flex-col gap-2">
             <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
@@ -48,7 +47,6 @@ export default function ProfilePage() {
               Redirecting to your public profile…
             </p>
           </div>
-          <Nav className="justify-end" />
         </header>
       </div>
     </main>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { searchUsers, followUser, unfollowUser } from "@/lib/social";
@@ -34,23 +33,20 @@ export default function PeoplePage() {
   if (loading) return <StoryLoading />;
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-4xl">
-        <header className="mb-10 flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">People</h1>
-            <p className="text-gray-400">Search users by username.</p>
-          </div>
-          <Nav className="justify-end" />
+    <main className="min-h-screen text-white flex flex-col items-center p-8">
+      <div className="w-full max-w-4xl pt-10">
+        <header className="mb-10">
+          <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Directory</div>
+          <h1 className="mt-3 text-4xl md:text-5xl font-bold leading-tight">People</h1>
+          <p className="mt-2 text-sm text-gray-400">Search users by username.</p>
         </header>
 
-        <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
+        <div className="command-surface rounded-md p-6">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value.toLowerCase())}
             placeholder="Search by username"
-            className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+            className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
           />
 
           <div className="mt-6 space-y-3">
@@ -62,7 +58,7 @@ export default function PeoplePage() {
               results.map((profile) => (
                 <div
                   key={profile.id}
-                  className="flex items-center justify-between p-4 rounded-2xl border border-gray-800 bg-black"
+                  className="flex items-center justify-between p-4 rounded-md border border-gray-800 bg-black"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-800 border border-gray-700 overflow-hidden">
@@ -103,7 +99,7 @@ export default function PeoplePage() {
                             }));
                         }
                       }}
-                      className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                      className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
                     >
                       {following[profile.id] ? "Unfollow" : "Follow"}
                     </button>

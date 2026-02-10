@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
@@ -94,26 +93,21 @@ export default function HistoryPage() {
   const calendarDays = buildCalendar(target.getFullYear(), target.getMonth());
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8">
-      <div className="w-full max-w-5xl">
-        <header className="mb-10 flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-              History
-            </h1>
-            <p className="text-gray-400">
-              Review past logs and revisit any day.
-            </p>
-          </div>
-          <Nav className="justify-end" />
+    <main className="min-h-screen text-white flex flex-col items-center justify-center p-8">
+      <div className="w-full max-w-5xl pt-10">
+        <header className="mb-10">
+          <div className="text-xs uppercase tracking-[0.3em] text-gray-500">History</div>
+          <h1 className="mt-3 text-4xl md:text-5xl font-bold leading-tight">History</h1>
+          <p className="mt-2 text-sm text-gray-400">
+            Review past logs and revisit any day.
+          </p>
         </header>
 
-        <section className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
+        <section className="command-surface rounded-md p-6">
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => setMonthOffset((prev) => prev - 1)}
-              className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+              className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
             >
               Previous
             </button>
@@ -125,7 +119,7 @@ export default function HistoryPage() {
             </div>
             <button
               onClick={() => setMonthOffset((prev) => prev + 1)}
-              className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+              className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
             >
               Next
             </button>
@@ -149,7 +143,7 @@ export default function HistoryPage() {
                   key={key}
                   href={`/day/${key}`}
                   className={[
-                    "p-3 rounded-xl border text-sm min-h-[80px] transition",
+                    "p-3 rounded-md border text-sm min-h-[80px] transition",
                     inMonth ? "border-gray-800 bg-black" : "border-gray-900 bg-gray-950",
                     row ? "text-white" : "text-gray-500",
                     row ? "hover:border-emerald-600" : "hover:border-gray-700",

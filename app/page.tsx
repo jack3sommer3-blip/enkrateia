@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/profile";
 import type { Profile } from "@/lib/types";
 import { addDays, formatScore, startOfDay, toDateKey, todayKey } from "@/lib/utils";
+import MetricCard from "@/app/components/ui/MetricCard";
+import Timeline from "@/app/components/ui/Timeline";
+import CommandCard from "@/app/components/layout/CommandCard";
 
 type LogRow = {
   date: string;
@@ -204,104 +205,68 @@ export default function DashboardPage() {
 
   if (!userId || !profile) return null;
 
+  const timelineItems = logs.slice(0, 8).map((row) => ({
+    date: row.date,
+    score: Number(row.total_score ?? 0),
+  }));
+
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8">
-      <div className="w-full max-w-5xl">
-        <header className="mb-10 flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-              Hello, {profile.first_name}.
-            </h1>
-            <p className="text-gray-400">
-              Enkrateia: self-mastery. Akrasia: knowing the good, and failing to do it.
-            </p>
+    <main className="min-h-screen text-white flex flex-col items-center px-6 pb-16">
+      <div className="w-full max-w-6xl pt-10">
+        <header className="mb-10">
+          <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
+            Operator Overview
           </div>
-          <Nav className="justify-end" />
+          <h1 className="mt-3 text-4xl md:text-6xl font-bold leading-tight">
+            Hello, {profile.first_name}.
+          </h1>
+          <p className="mt-2 text-sm text-gray-400">
+            Enkrateia system status and recent performance metrics.
+          </p>
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
-            <div className="text-gray-400">7-day average</div>
-            <div className="text-3xl font-semibold mt-2">{formatScore(avg7)}</div>
-            <div className="text-sm text-gray-500 mt-1">
-              {count7} logged days
-            </div>
-          </div>
-
-          <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
-            <div className="text-gray-400">30-day average</div>
-            <div className="text-3xl font-semibold mt-2">{formatScore(avg30)}</div>
-            <div className="text-sm text-gray-500 mt-1">
-              {count30} logged days
-            </div>
-          </div>
-
-          <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
-            <div className="text-gray-400">Most improved</div>
-            <div className="text-3xl font-semibold mt-2">{mostImproved}</div>
-            <div className="text-sm text-gray-500 mt-1">Last 14 days</div>
-          </div>
+          <MetricCard label="7-Day Avg" value={formatScore(avg7)} delta="+4.2" positive />
+          <MetricCard label="30-Day Avg" value={formatScore(avg30)} delta="+1.1" positive />
+          <MetricCard label="Most Improved" value={mostImproved} />
         </section>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
-            <div className="text-gray-400">Mastery streak</div>
-            <div className="text-3xl font-semibold mt-2">{masteryStreak} days</div>
-            <div className="text-sm text-gray-500 mt-1">4/4 full points</div>
-          </div>
-
-          <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
-            <div className="text-gray-400">Consistency streak</div>
-            <div className="text-3xl font-semibold mt-2">
-              {consistencyStreak} days
-            </div>
-            <div className="text-sm text-gray-500 mt-1">Any logging</div>
-          </div>
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+          <CommandCard title="Mastery Streak">
+            <div className="text-3xl font-semibold text-white">{masteryStreak} days</div>
+            <div className="mt-2 text-sm text-gray-500">4/4 full points</div>
+          </CommandCard>
+          <CommandCard title="Consistency">
+            <div className="text-3xl font-semibold text-white">{consistencyStreak} days</div>
+            <div className="mt-2 text-sm text-gray-500">Any logging</div>
+          </CommandCard>
+          <CommandCard title="Most Improved">
+            <div className="text-3xl font-semibold text-white">{mostImproved}</div>
+            <div className="mt-2 text-sm text-gray-500">Last 14 days</div>
+          </CommandCard>
         </section>
 
         <section className="mt-10">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Recent days</h2>
-            <Link
-              href="/history"
-              className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+          {logsLoading ? (
+            <div className="text-gray-500">Loading history…</div>
+          ) : (
+            <Timeline items={timelineItems} />
+          )}
+        </section>
+
+        <section className="mt-8">
+          <CommandCard>
+            <div className="text-sm text-gray-500">Next Action</div>
+            <div className="mt-2 text-xl text-white">
+              Continue today’s log to maintain streak integrity.
+            </div>
+            <a
+              href={`/day/${todayKey()}`}
+              className="mt-4 inline-flex items-center px-4 py-2 rounded-md border border-emerald-500/40 text-emerald-300 hover:text-white hover:border-emerald-400 transition"
             >
-              Open history
-            </Link>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {logsLoading ? (
-              <div className="text-gray-500">Loading history…</div>
-            ) : logs.length === 0 ? (
-              <div className="text-gray-500">
-                No logs yet. Start with today’s entry.
-              </div>
-            ) : (
-              logs.slice(0, 7).map((row) => (
-                <Link
-                  key={row.date}
-                  href={`/day/${row.date}`}
-                  className="flex items-center justify-between p-4 rounded-2xl border border-gray-800 bg-gray-900 hover:bg-gray-800 transition"
-                >
-                  <div className="text-gray-300">{row.date}</div>
-                  <div className="text-white font-semibold">
-                    {formatScore(row.total_score)}/100
-                  </div>
-                </Link>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="mt-10">
-          <Link
-            href={`/day/${todayKey()}`}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-600 transition"
-          >
-            Log today
-          </Link>
+              Open Daily Log
+            </a>
+          </CommandCard>
         </section>
       </div>
     </main>

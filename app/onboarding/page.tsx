@@ -64,7 +64,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+    <main className="min-h-screen text-white flex items-center justify-center p-8">
       <div className="w-full max-w-lg">
         <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
         <h1 className="text-4xl font-semibold mt-4">Create your profile</h1>
@@ -77,19 +77,19 @@ export default function OnboardingPage() {
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             placeholder="First name"
-            className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+            className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
           />
           <input
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             placeholder="Last name"
-            className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+            className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
           />
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value.toLowerCase())}
             placeholder="Username"
-            className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+            className="w-full px-4 py-3 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
           />
         </div>
 
@@ -97,7 +97,7 @@ export default function OnboardingPage() {
         <button
           onClick={saveProfile}
           disabled={saving}
-          className="mt-6 w-full px-4 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition disabled:opacity-50"
+          className="mt-6 w-full px-4 py-3 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save profile"}
         </button>

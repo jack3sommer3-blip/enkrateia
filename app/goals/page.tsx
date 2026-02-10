@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
@@ -145,23 +144,22 @@ export default function GoalsPage() {
   if (!userId) return null;
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-4xl">
-        <header className="mb-10 flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">Goals</h1>
-            <p className="text-gray-400">
-              Choose what counts toward scoring. Each enabled variable is weighted
-              equally in its category.
-            </p>
-          </div>
-          <Nav className="justify-end" />
+    <main className="min-h-screen text-white flex flex-col items-center p-8">
+      <div className="w-full max-w-4xl pt-10">
+        <header className="mb-10">
+          <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Goals</div>
+          <h1 className="mt-3 text-4xl md:text-5xl font-bold leading-tight">
+            Scoring Configuration
+          </h1>
+          <p className="mt-2 text-sm text-gray-400">
+            Choose what counts toward scoring. Each enabled variable is weighted
+            equally in its category.
+          </p>
         </header>
 
         <section className="space-y-6">
           {(Object.keys(GOAL_OPTIONS) as (keyof Goals)[]).map((category) => (
-            <div key={category} className="p-6 rounded-2xl border border-gray-800 bg-gray-900">
+            <div key={category} className="command-surface rounded-md p-6">
               <div className="text-2xl font-semibold capitalize">{category}</div>
               <div className="mt-4 space-y-4">
                 {GOAL_OPTIONS[category].map((option) => {
@@ -193,7 +191,7 @@ export default function GoalsPage() {
                         onChange={(e) =>
                           updateTarget(category, option.key, e.target.value)
                         }
-                        className="w-full md:w-48 px-4 py-2 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-40"
+                        className="w-full md:w-48 px-4 py-2 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-40"
                       />
                     </div>
                   );
@@ -209,13 +207,13 @@ export default function GoalsPage() {
           <button
             onClick={saveGoals}
             disabled={saving}
-            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition disabled:opacity-50"
+            className="px-4 py-2 rounded-md border border-emerald-500/60 text-emerald-300 hover:text-white hover:border-emerald-400 transition disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save goals"}
           </button>
           <button
             onClick={resetDefaults}
-            className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+            className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
           >
             Reset to defaults
           </button>
