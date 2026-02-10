@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import type { Comment, FeedItem, Follow, Like, Profile } from "@/lib/types";
+import type { Comment, FeedItem, Follow, Like, Profile, DayData, ReadingEvent, WorkoutActivity } from "@/lib/types";
+import { addDays, intFromText, toDateKey } from "@/lib/utils";
 
 export async function searchUsers(query: string) {
   if (!query.trim()) return [];
@@ -102,11 +103,177 @@ export async function upsertFeedItem(input: {
 }) {
   const { data, error } = await supabase
     .from("feed_items")
-    .insert(input)
+    .upsert(input, { onConflict: "user_id,event_type,event_id" })
     .select("id, user_id, created_at, event_date, event_type, event_id, summary, metadata")
     .single();
   if (error) return undefined;
   return data as FeedItem;
+}
+
+function stableUuid(seed: string) {
+  const hash = (input: string, seedNum: number) => {
+    let h = seedNum >>> 0;
+    for (let i = 0; i < input.length; i += 1) {
+      h = Math.imul(h ^ input.charCodeAt(i), 0x5bd1e995);
+      h = (h >>> 0) ^ (h >>> 13);
+    }
+    return h >>> 0;
+  };
+  const h1 = hash(seed, 0x1234abcd).toString(16).padStart(8, "0");
+  const h2 = hash(seed, 0x9e3779b1).toString(16).padStart(8, "0");
+  const h3 = hash(seed, 0x7f4a7c15).toString(16).padStart(8, "0");
+  const h4 = hash(seed, 0xcafef00d).toString(16).padStart(8, "0");
+  const hex = `${h1}${h2}${h3}${h4}`;
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(
+    16,
+    20
+  )}-${hex.slice(20, 32)}`;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function ensureUuid(value: string | undefined, seed: string) {
+  if (value && UUID_RE.test(value)) return value;
+  return stableUuid(seed);
+}
+
+function workoutSummary(activity: WorkoutActivity) {
+  const minutes = intFromText(activity.minutesText) ?? 0;
+  const seconds = intFromText(activity.secondsText) ?? 0;
+  const intensity = intFromText(activity.intensityText);
+  const timeLabel =
+    minutes > 0
+      ? `${minutes} min`
+      : seconds > 0
+        ? `${seconds} sec`
+        : undefined;
+  const parts = [activity.type, timeLabel, intensity ? `Intensity ${intensity}` : undefined].filter(
+    Boolean
+  );
+  return parts.join(" • ");
+}
+
+function readingSummary(event: ReadingEvent) {
+  const totalPages =
+    event.pages ?? (event.fictionPages ?? 0) + (event.nonfictionPages ?? 0);
+  const base = totalPages ? `Read ${totalPages} pages` : "Read";
+  return event.title ? `${base} • ${event.title}` : base;
+}
+
+export async function backfillFeedItemsForUser(userId: string, days = 30) {
+  const start = addDays(new Date(), -(Math.max(days, 1) - 1));
+  const startKey = toDateKey(start);
+
+  const { data: logs, error: logsError } = await supabase
+    .from("daily_logs")
+    .select("date,data")
+    .eq("user_id", userId)
+    .gte("date", startKey);
+
+  if (logsError) return false;
+
+  const items: Array<{
+    user_id: string;
+    event_date: string;
+    event_type: "workout" | "reading" | "drinking";
+    event_id: string;
+    summary: string;
+    metadata: Record<string, unknown>;
+  }> = [];
+
+  (logs ?? []).forEach((row: { date: string; data: DayData }) => {
+    const data = row.data;
+    const dateKey = row.date;
+
+    const activities = data?.workouts?.activities ?? [];
+    activities.forEach((activity, index) => {
+      const eventId = ensureUuid(activity.id, `${dateKey}-workout-${index}`);
+      items.push({
+        user_id: userId,
+        event_date: dateKey,
+        event_type: "workout",
+        event_id: eventId,
+        summary: workoutSummary(activity),
+        metadata: {
+          activityType: activity.type,
+          minutes: activity.minutesText,
+          seconds: activity.secondsText,
+          calories: activity.caloriesText,
+          intensity: activity.intensityText,
+        },
+      });
+    });
+
+    const readingEvents = data?.reading?.events ?? [];
+    if (readingEvents.length > 0) {
+      readingEvents.forEach((event, index) => {
+        const eventId = ensureUuid(event.id, `${dateKey}-reading-${index}`);
+        items.push({
+          user_id: userId,
+          event_date: dateKey,
+          event_type: "reading",
+          event_id: eventId,
+          summary: readingSummary(event),
+          metadata: {
+            title: event.title,
+            pages: event.pages,
+            fiction_pages: event.fictionPages,
+            nonfiction_pages: event.nonfictionPages,
+            quote: event.quote,
+          },
+        });
+      });
+    } else if (data?.reading?.title || data?.reading?.pagesText) {
+      const pages = intFromText(data.reading.pagesText) ?? 0;
+      const eventId = stableUuid(`${dateKey}-reading-legacy`);
+      items.push({
+        user_id: userId,
+        event_date: dateKey,
+        event_type: "reading",
+        event_id: eventId,
+        summary: readingSummary({
+          id: eventId,
+          title: data.reading.title,
+          pages,
+        }),
+        metadata: {
+          title: data.reading.title,
+          pages,
+        },
+      });
+    }
+  });
+
+  const { data: drinkingEvents, error: drinkingError } = await supabase
+    .from("drinking_events")
+    .select("id, date, tier, drinks, note")
+    .eq("user_id", userId)
+    .gte("date", startKey);
+
+  if (!drinkingError && drinkingEvents) {
+    drinkingEvents.forEach((event: any) => {
+      items.push({
+        user_id: userId,
+        event_date: event.date,
+        event_type: "drinking",
+        event_id: event.id,
+        summary: `Tier ${event.tier} • ${event.drinks} drinks`,
+        metadata: {
+          tier: event.tier,
+          drinks: event.drinks,
+          note: event.note,
+        },
+      });
+    });
+  }
+
+  if (items.length === 0) return true;
+
+  const { error: upsertError } = await supabase
+    .from("feed_items")
+    .upsert(items, { onConflict: "user_id,event_type,event_id" });
+
+  return !upsertError;
 }
 
 export async function updateFeedItemByEvent(

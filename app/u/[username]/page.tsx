@@ -19,6 +19,7 @@ import {
   getLikesForFeed,
   deleteComment,
   getProfileByUsername,
+  backfillFeedItemsForUser,
 } from "@/lib/social";
 import type { Profile, FeedItem, Comment, Like } from "@/lib/types";
 
@@ -55,23 +56,30 @@ export default function PublicProfilePage() {
 
   useEffect(() => {
     if (!profile?.id) return;
-    getUserFeed(profile.id).then((items) => {
+    let active = true;
+    const load = async () => {
+      if (userId && userId === profile.id) {
+        await backfillFeedItemsForUser(userId);
+      }
+      const items = await getUserFeed(profile.id);
+      if (!active) return;
       setFeedItems(items);
-      getLikesForFeed(items.map((item) => item.id)).then((likesList) => {
-        const grouped: Record<string, Like[]> = {};
-        likesList.forEach((like) => {
-          grouped[like.feed_item_id] = [...(grouped[like.feed_item_id] ?? []), like];
-        });
-        setLikes(grouped);
-        if (userId) {
-          const likedMap: Record<string, boolean> = {};
-          likesList.forEach((like) => {
-            if (like.user_id === userId) likedMap[like.feed_item_id] = true;
-          });
-          setLiked(likedMap);
-        }
+      const likesList = await getLikesForFeed(items.map((item) => item.id));
+      if (!active) return;
+      const grouped: Record<string, Like[]> = {};
+      likesList.forEach((like) => {
+        grouped[like.feed_item_id] = [...(grouped[like.feed_item_id] ?? []), like];
       });
-    });
+      setLikes(grouped);
+      if (userId) {
+        const likedMap: Record<string, boolean> = {};
+        likesList.forEach((like) => {
+          if (like.user_id === userId) likedMap[like.feed_item_id] = true;
+        });
+        setLiked(likedMap);
+      }
+    };
+    load();
     listFollowers(profile.id).then(setFollowers);
     listFollowing(profile.id).then(setFollowing);
     if (userId && userId !== profile.id) {
@@ -85,6 +93,9 @@ export default function PublicProfilePage() {
           setIsFollowing(!!data);
         });
     }
+    return () => {
+      active = false;
+    };
   }, [profile?.id, userId]);
 
   if (loading || sessionLoading) return <StoryLoading />;

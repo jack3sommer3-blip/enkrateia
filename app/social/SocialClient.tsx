@@ -9,6 +9,7 @@ import { useSession } from "@/app/components/useSession";
 import { getProfile } from "@/lib/profile";
 import {
   addComment,
+  backfillFeedItemsForUser,
   getFeed,
   getLikesForFeed,
   listComments,
@@ -64,25 +65,32 @@ export default function SocialClient() {
 
   useEffect(() => {
     if (!userId) return;
-    listFollowing(userId).then((rows: any[]) => {
+    let active = true;
+    const load = async () => {
+      await backfillFeedItemsForUser(userId);
+      const rows: any[] = await listFollowing(userId);
       const followingIds = rows.map((row) => row.following_id);
       const ids = Array.from(new Set([userId, ...followingIds]));
-      getFeed(ids).then((items: any[]) => {
-        setFeed(items);
-        getLikesForFeed(items.map((item) => item.id)).then((likesList) => {
-          const grouped: Record<string, Like[]> = {};
-          likesList.forEach((like) => {
-            grouped[like.feed_item_id] = [...(grouped[like.feed_item_id] ?? []), like];
-          });
-          setLikes(grouped);
-          const likedMap: Record<string, boolean> = {};
-          likesList.forEach((like) => {
-            if (like.user_id === userId) likedMap[like.feed_item_id] = true;
-          });
-          setLiked(likedMap);
-        });
+      const items: any[] = await getFeed(ids);
+      if (!active) return;
+      setFeed(items);
+      const likesList = await getLikesForFeed(items.map((item) => item.id));
+      if (!active) return;
+      const grouped: Record<string, Like[]> = {};
+      likesList.forEach((like) => {
+        grouped[like.feed_item_id] = [...(grouped[like.feed_item_id] ?? []), like];
       });
-    });
+      setLikes(grouped);
+      const likedMap: Record<string, boolean> = {};
+      likesList.forEach((like) => {
+        if (like.user_id === userId) likedMap[like.feed_item_id] = true;
+      });
+      setLiked(likedMap);
+    };
+    load();
+    return () => {
+      active = false;
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -124,22 +132,7 @@ export default function SocialClient() {
 
   return (
     <main className="min-h-screen text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-5xl pt-10">
-        <header className="mb-10">
-          <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Social</div>
-          <h1 className="mt-3 text-4xl md:text-5xl font-bold leading-tight">Social</h1>
-          <p className="mt-2 text-sm text-gray-400">Feed, search, and your profile.</p>
-        </header>
-
-        <div className="command-surface rounded-md p-4 mb-6">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value.toLowerCase())}
-            placeholder="Search by username"
-            className="w-full px-4 py-3 rounded-md bg-black/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/10"
-          />
-        </div>
-
+      <div className="w-full max-w-5xl pt-6">
         <Tabs
           tabs={[...TABS]}
           active={activeTab}
@@ -264,14 +257,22 @@ export default function SocialClient() {
           </section>
         ) : null}
 
-        {activeTab === "Search" || query.trim() ? (
+        {activeTab === "Search" ? (
           <section className="mt-6">
             <div className="command-surface rounded-md p-6">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value.toLowerCase())}
+                placeholder="Search by username"
+                className="w-full px-4 py-3 rounded-md bg-black/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/10"
+              />
               <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
-                Search Results
+                Results
               </div>
               <div className="mt-4 space-y-3">
-                {loadingResults ? (
+                {!query.trim() ? (
+                  <div className="text-gray-500">Start typing to search users.</div>
+                ) : loadingResults ? (
                   <div className="text-gray-500">Searching…</div>
                 ) : results.length === 0 ? (
                   <div className="text-gray-500">No users found.</div>
@@ -313,18 +314,33 @@ export default function SocialClient() {
           <section className="mt-6">
             <div className="command-surface rounded-md p-6">
               <div className="flex items-center justify-between gap-6">
-                <div>
-                  <div className="text-2xl font-semibold text-white">{displayName || "Your profile"}</div>
-                  <div className="text-gray-400 mt-1">@{profile?.username ?? ""}</div>
-                  <div className="text-gray-500 mt-2 text-sm">
-                    {followersCount} Followers • {followingCount} Following
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-full border border-white/10 bg-slate-800 overflow-hidden flex items-center justify-center">
+                    {profile?.profile_photo_url ? (
+                      <img
+                        src={profile.profile_photo_url}
+                        alt={displayName || "Profile"}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xs text-gray-400">ME</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-2xl font-semibold text-white">
+                      {displayName || "Your profile"}
+                    </div>
+                    <div className="text-gray-400 mt-1">@{profile?.username ?? ""}</div>
+                    <div className="text-gray-500 mt-2 text-sm">
+                      {followersCount} Followers • {followingCount} Following
+                    </div>
                   </div>
                 </div>
                 <Link
-                  href={profile?.username ? `/u/${profile.username}` : "/onboarding"}
+                  href="/settings"
                   className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20"
                 >
-                  Open profile
+                  Edit profile
                 </Link>
               </div>
               {profile?.bio ? (
@@ -332,6 +348,39 @@ export default function SocialClient() {
               ) : (
                 <div className="mt-4 text-gray-500 text-sm">Add a bio in settings.</div>
               )}
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="command-surface rounded-md p-6">
+                <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
+                  Activity
+                </div>
+                <div className="mt-4 space-y-3">
+                  {feed.filter((item) => item.user_id === userId).length === 0 ? (
+                    <div className="text-gray-500">No activity yet.</div>
+                  ) : (
+                    feed
+                      .filter((item) => item.user_id === userId)
+                      .map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-md border border-white/10 bg-black/40 px-4 py-3"
+                        >
+                          <div className="text-white font-semibold">{item.summary}</div>
+                          <div className="text-gray-500 text-sm mt-1">
+                            {new Date(item.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+              <div className="command-surface rounded-md p-6">
+                <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
+                  Badges
+                </div>
+                <div className="mt-4 text-gray-500">Badges coming soon.</div>
+              </div>
             </div>
           </section>
         ) : null}
