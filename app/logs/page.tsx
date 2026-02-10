@@ -93,17 +93,6 @@ export default function LogsPage() {
     return map;
   }, [logs]);
 
-  if (loading || profileLoading) {
-    return <StoryLoading name={profile?.first_name} />;
-  }
-
-  if (!userId || !profile) return null;
-
-  const base = new Date();
-  const target = new Date(base.getFullYear(), base.getMonth() + monthOffset, 1);
-  const calendarDays = buildCalendar(target.getFullYear(), target.getMonth());
-  const selectedRow = logMap.get(selectedDate);
-
   const weeklyAverage = useMemo(() => {
     const end = new Date(selectedDate);
     let sum = 0;
@@ -118,6 +107,17 @@ export default function LogsPage() {
     }
     return count ? sum / count : 0;
   }, [logMap, selectedDate]);
+
+  if (loading || profileLoading) {
+    return <StoryLoading name={profile?.first_name} />;
+  }
+
+  if (!userId || !profile) return null;
+
+  const base = new Date();
+  const target = new Date(base.getFullYear(), base.getMonth() + monthOffset, 1);
+  const calendarDays = buildCalendar(target.getFullYear(), target.getMonth());
+  const selectedRow = logMap.get(selectedDate);
 
   const readiness = selectedRow?.total_score ?? 0;
   const delta = readiness - weeklyAverage;
