@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, forwardRef } from "react";
 import Nav from "@/app/components/Nav";
 import { supabase } from "@/lib/supabase";
 import { DayData, ActivityType, WorkoutActivity, DrinkingEvent } from "@/lib/types";
@@ -55,8 +55,8 @@ export default function DailyLog({
   const [drinkingEvents, setDrinkingEvents] = useState<DrinkingEvent[]>([]);
   const [drinkingOpen, setDrinkingOpen] = useState(false);
   const [drinkingTier, setDrinkingTier] = useState<1 | 2 | 3>(2);
-  const [drinkingDrinks, setDrinkingDrinks] = useState("0");
-  const [drinkingNote, setDrinkingNote] = useState("");
+  const drinkingDrinksRef = useRef<HTMLInputElement | null>(null);
+  const drinkingNoteRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -295,17 +295,21 @@ export default function DailyLog({
     <div className="text-gray-400 text-sm mb-1">{children}</div>
   );
 
-  const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input
-      {...props}
-      type={props.type ?? "text"}
-      className={[
-        "w-full px-3 py-2 rounded-xl bg-black border border-gray-700",
-        "focus:outline-none focus:ring-2 focus:ring-gray-600",
-        props.className ?? "",
-      ].join(" ")}
-    />
+  const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+    (props, ref) => (
+      <input
+        {...props}
+        ref={ref}
+        type={props.type ?? "text"}
+        className={[
+          "w-full px-3 py-2 rounded-xl bg-black border border-gray-700",
+          "focus:outline-none focus:ring-2 focus:ring-gray-600",
+          props.className ?? "",
+        ].join(" ")}
+      />
+    )
   );
+  Input.displayName = "Input";
 
   const TextArea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
     <textarea
@@ -684,36 +688,37 @@ export default function DailyLog({
                     <Input
                       inputMode="numeric"
                       placeholder="0–20"
-                      value={drinkingDrinks}
-                      onChange={(e) => setDrinkingDrinks(e.target.value)}
+                      defaultValue="0"
+                      ref={drinkingDrinksRef}
                     />
                   </div>
                   <div>
                     <Label>Note (optional)</Label>
                     <Input
                       placeholder="e.g., wedding"
-                      value={drinkingNote}
-                      onChange={(e) => setDrinkingNote(e.target.value)}
+                      ref={drinkingNoteRef}
                     />
                   </div>
                   <div className="md:col-span-3">
                     <button
                       onClick={async () => {
+                        const drinkValue = drinkingDrinksRef.current?.value ?? "0";
+                        const noteValue = drinkingNoteRef.current?.value ?? "";
                         const drinks = Math.max(
                           0,
-                          Math.min(20, Number(drinkingDrinks) || 0)
+                          Math.min(20, Number(drinkValue) || 0)
                         );
                         const created = await createDrinkingEvent({
                           user_id: userId,
                           date: dateKey,
                           tier: drinkingTier,
                           drinks,
-                          note: drinkingNote.trim() || null,
+                          note: noteValue.trim() || null,
                         });
                         if (created) {
                           setDrinkingEvents((prev) => [...prev, created]);
-                          setDrinkingDrinks("0");
-                          setDrinkingNote("");
+                          if (drinkingDrinksRef.current) drinkingDrinksRef.current.value = "0";
+                          if (drinkingNoteRef.current) drinkingNoteRef.current.value = "";
                           setDrinkingOpen(false);
                         }
                       }}
