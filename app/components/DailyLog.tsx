@@ -405,10 +405,10 @@ export default function DailyLog({
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
       <div className="w-full max-w-4xl">
-        <header className="mb-10 flex flex-col gap-6">
+        <header className="mb-10 flex items-center justify-between">
           <div className="flex flex-col gap-3">
             <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-5xl md:text-6xl font-bold tracking-wide leading-none">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-wide leading-none">
               {title ?? "Daily Log"}
             </h1>
 
@@ -439,8 +439,7 @@ export default function DailyLog({
               ) : null}
             </div>
           </div>
-
-          <Nav />
+          <Nav className="justify-end" />
         </header>
 
         <div key={formKey} className="grid grid-cols-1 gap-6">

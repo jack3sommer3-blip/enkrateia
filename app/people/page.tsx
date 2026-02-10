@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
@@ -13,17 +13,22 @@ export default function PeoplePage() {
   const [results, setResults] = useState<Profile[]>([]);
   const [loadingResults, setLoadingResults] = useState(false);
   const [following, setFollowing] = useState<Record<string, boolean>>({});
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!query.trim()) {
       setResults([]);
+      setLoadingResults(false);
       return;
     }
     setLoadingResults(true);
-    searchUsers(query).then((data) => {
-      setResults(data);
-      setLoadingResults(false);
-    });
+    debounceRef.current = setTimeout(() => {
+      searchUsers(query).then((data) => {
+        setResults(data);
+        setLoadingResults(false);
+      });
+    }, 350);
   }, [query]);
 
   if (loading) return <StoryLoading />;
@@ -31,13 +36,13 @@ export default function PeoplePage() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
       <div className="w-full max-w-4xl">
-        <header className="mb-10 flex flex-col gap-6">
+        <header className="mb-10 flex items-center justify-between">
           <div className="flex flex-col gap-2">
             <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight">People</h1>
+            <h1 className="text-4xl md:text-5xl font-bold leading-tight">People</h1>
             <p className="text-gray-400">Search users by username.</p>
           </div>
-          <Nav />
+          <Nav className="justify-end" />
         </header>
 
         <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900">

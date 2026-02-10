@@ -15,11 +15,11 @@ const links = [
   { href: "/settings", label: "Settings" },
 ];
 
-export default function Nav() {
+export default function Nav({ className }: { className?: string }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap items-center gap-2 md:gap-3">
+    <nav className={["flex flex-wrap items-center gap-2 md:gap-3", className ?? ""].join(" ")}>
       {links.map((link) => {
         const active = pathname === link.href;
         return (
@@ -27,10 +27,10 @@ export default function Nav() {
             key={link.href}
             href={link.href}
             className={[
-              "px-4 py-2 rounded-xl border transition",
+              "px-4 py-2 rounded-full border transition text-sm font-medium",
               active
-                ? "bg-emerald-950 border-emerald-700 text-white"
-                : "bg-gray-900 border-gray-800 text-gray-300 hover:text-white",
+                ? "bg-emerald-900/60 border-emerald-700 text-white"
+                : "bg-gray-900/70 border-gray-800 text-gray-300 hover:text-white hover:border-gray-600",
             ].join(" ")}
           >
             {link.label}

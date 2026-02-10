@@ -147,17 +147,16 @@ export default function GoalsPage() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
       <div className="w-full max-w-4xl">
-        <header className="mb-10 flex flex-col gap-6">
+        <header className="mb-10 flex items-center justify-between">
           <div className="flex flex-col gap-2">
             <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight">Goals</h1>
+            <h1 className="text-4xl md:text-5xl font-bold leading-tight">Goals</h1>
             <p className="text-gray-400">
               Choose what counts toward scoring. Each enabled variable is weighted
               equally in its category.
             </p>
           </div>
-
-          <Nav />
+          <Nav className="justify-end" />
         </header>
 
         <section className="space-y-6">
@@ -178,7 +177,7 @@ export default function GoalsPage() {
                           type="checkbox"
                           checked={enabled}
                           onChange={() => toggleVariable(category, option.key)}
-                          className="w-5 h-5 accent-emerald-500"
+                          className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-emerald-500 checked:border-emerald-400 transition"
                         />
                         <div>
                           <div className="text-white">{option.label}</div>

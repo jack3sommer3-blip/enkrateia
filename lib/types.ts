@@ -69,6 +69,7 @@ export type Profile = {
   created_at: string | null;
   first_name: string;
   last_name: string;
+  location?: string | null;
 };
 
 export type GoalCategory = {

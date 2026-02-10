@@ -3,37 +3,29 @@
 import Nav from "@/app/components/Nav";
 
 const MISSION = [
-  "ENKRATEIA",
-  "A System for Self-Discipline",
-  "I recently came across the greek word Akrasia.\nIt is the condition of knowing what is right and failing to do it.",
-  "We live in an age that rewards impulse. Comfort is abundant and distraction is constant.",
-  "Food arrives at our doorsteps without effort. We have infinite entertainment at our fingertips, and indulgence is encouraged.",
-  "I felt the word akrasia, although ancient, described our society disgustingly well.",
-  "Enkrateia is the antithesis of akrasia.",
-  "The Greeks used the word to describe self-mastery. The ability to act in accordance with reason. The strength to do what must be done when it would be easier not to.",
-  "This platform exists to cultivate that strength.",
-  "You train your body.\nYou sharpen your mind.\nYou guard your sleep.\nYou prepare your meals.\nYou account for your days.",
+  "Welcome to Enkrateia.",
+  "Thank you for answering the call to join me on this journey towards a more disciplined life. Whatever your goals may be, it is my hope that this platform helps you achieve them.",
   "What is measured is confronted.\nWhat is confronted is improved.",
-  "Enkrateia provides structure where impulse would otherwise rule.",
-  "The question is not whether the world tempts you.",
-  "The question is whether you will answer.",
-  "Enkrateia is a system for those who intend to.",
+  "-Jack Sommer\n@jack",
+  "Here are the words that inspired this platform:",
+  "Akrasia (ἀκρασία)",
+  "Literal meaning: “Lack of control”\nBreakdown: a- (without) + kratos (power / rule)",
+  "Definition:\n\nActing against your better judgment because of weakness of will.",
+  "Enkrateia (ἐγκράτεια)",
+  "Literal meaning: “Power within” / “Self-mastery”\nBreakdown: en- (within) + kratos (power / rule)",
+  "Definition:\n\nSelf-control; the ability to act according to reason rather than impulse.",
 ];
 
 export default function MissionPage() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
       <div className="w-full max-w-3xl">
-        <header className="mb-10 flex flex-col gap-6">
+        <header className="mb-10 flex items-center justify-between">
           <div className="flex flex-col gap-2">
             <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight">Mission</h1>
-            <p className="text-gray-400">
-              The philosophy behind the system, written plainly.
-            </p>
+            <h1 className="text-4xl md:text-5xl font-bold leading-tight">Mission</h1>
           </div>
-
-          <Nav />
+          <Nav className="justify-end" />
         </header>
 
         <section className="space-y-6 text-lg leading-relaxed text-gray-200">

@@ -38,17 +38,17 @@ export default function ProfilePage() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
       <div className="w-full max-w-5xl">
-        <header className="mb-10 flex flex-col gap-6">
+        <header className="mb-10 flex items-center justify-between">
           <div className="flex flex-col gap-2">
             <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight">
+            <h1 className="text-4xl md:text-5xl font-bold leading-tight">
               Profile
             </h1>
             <p className="text-gray-400">
               Redirecting to your public profile…
             </p>
           </div>
-          <Nav />
+          <Nav className="justify-end" />
         </header>
       </div>
     </main>

@@ -34,9 +34,7 @@ export default function PublicProfilePage() {
   const { loading: sessionLoading, userId } = useSession();
   const [profile, setProfile] = useState<Profile | undefined>();
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"activity" | "badges" | "followers" | "following">(
-    "activity"
-  );
+  const [tab, setTab] = useState<"activity" | "badges">("activity");
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [followers, setFollowers] = useState<any[]>([]);
   const [following, setFollowing] = useState<any[]>([]);
@@ -112,7 +110,7 @@ export default function PublicProfilePage() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center p-8">
       <div className="w-full max-w-5xl">
-        <header className="mb-10 flex flex-col gap-6">
+        <header className="mb-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-2xl font-semibold">
@@ -127,8 +125,23 @@ export default function PublicProfilePage() {
                 )}
               </div>
               <div>
-                <div className="text-3xl font-semibold">{displayName}</div>
-                <div className="text-gray-400">@{profile.username}</div>
+                <div className="text-3xl font-semibold flex items-center gap-2">
+                  {displayName}
+                  <span className="text-gray-500 text-sm">
+                    {profile.location ? `• ${profile.location}` : ""}
+                  </span>
+                </div>
+                <div className="text-gray-400 flex items-center gap-3">
+                  <span>@{profile.username}</span>
+                  <span className="text-gray-600">•</span>
+                  <span className="text-gray-300">
+                    {followers.length} Followers
+                  </span>
+                  <span className="text-gray-600">•</span>
+                  <span className="text-gray-300">
+                    {following.length} Following
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -143,21 +156,24 @@ export default function PublicProfilePage() {
                     if (res) setIsFollowing(true);
                   }
                 }}
-                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                className="px-4 py-2 rounded-full bg-emerald-700 hover:bg-emerald-600 transition"
               >
                 {isFollowing ? "Unfollow" : "Follow"}
               </button>
             ) : (
               <Link
                 href="/"
-                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                className="px-4 py-2 rounded-full bg-gray-800 hover:bg-gray-700 transition"
               >
                 Back to app
               </Link>
             )}
           </div>
 
-          <Nav />
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
+            <Nav className="justify-end" />
+          </div>
         </header>
 
         {profile.bio ? (
@@ -171,7 +187,7 @@ export default function PublicProfilePage() {
         )}
 
         <section className="mt-8 flex flex-wrap gap-2">
-          {["activity", "badges", "followers", "following"].map((item) => (
+          {["activity", "badges"].map((item) => (
             <button
               key={item}
               onClick={() => setTab(item as typeof tab)}
@@ -313,44 +329,6 @@ export default function PublicProfilePage() {
 
         {tab === "badges" ? (
           <section className="mt-6 text-gray-500">Badges coming soon.</section>
-        ) : null}
-
-        {tab === "followers" ? (
-          <section className="mt-6 space-y-3">
-            {followers.length === 0 ? (
-              <div className="text-gray-500">No followers yet.</div>
-            ) : (
-              followers.map((row: any) => (
-                <Link
-                  key={row.follower_id}
-                  href={`/u/${row.profiles.username}`}
-                  className="flex items-center justify-between p-4 rounded-2xl border border-gray-800 bg-gray-900"
-                >
-                  <div className="text-white">{row.profiles.display_name}</div>
-                  <div className="text-gray-400">@{row.profiles.username}</div>
-                </Link>
-              ))
-            )}
-          </section>
-        ) : null}
-
-        {tab === "following" ? (
-          <section className="mt-6 space-y-3">
-            {following.length === 0 ? (
-              <div className="text-gray-500">Not following anyone yet.</div>
-            ) : (
-              following.map((row: any) => (
-                <Link
-                  key={row.following_id}
-                  href={`/u/${row.profiles.username}`}
-                  className="flex items-center justify-between p-4 rounded-2xl border border-gray-800 bg-gray-900"
-                >
-                  <div className="text-white">{row.profiles.display_name}</div>
-                  <div className="text-gray-400">@{row.profiles.username}</div>
-                </Link>
-              ))
-            )}
-          </section>
         ) : null}
       </div>
     </main>
