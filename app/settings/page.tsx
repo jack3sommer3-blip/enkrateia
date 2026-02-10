@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
@@ -8,6 +8,8 @@ import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/profile";
 import type { Profile } from "@/lib/types";
+import Cropper from "react-easy-crop";
+import { getCroppedImageBlob } from "@/lib/cropImage";
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
 
@@ -27,6 +29,16 @@ export default function SettingsPage() {
   const [showWorkouts, setShowWorkouts] = useState(true);
   const [showReading, setShowReading] = useState(true);
   const [showDrinking, setShowDrinking] = useState(true);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<{
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -85,6 +97,13 @@ export default function SettingsPage() {
       return;
     }
   };
+
+  const onCropComplete = useCallback(
+    (_: { x: number; y: number }, croppedArea: { width: number; height: number; x: number; y: number }) => {
+      setCroppedAreaPixels(croppedArea);
+    },
+    []
+  );
 
   if (loading || profileLoading) {
     return <StoryLoading name={profile?.first_name} />;
@@ -169,19 +188,13 @@ export default function SettingsPage() {
                 accept="image/*"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
-                  if (!file || !userId) return;
-                  const filePath = `${userId}/${crypto.randomUUID()}`;
-                  const { error: uploadError } = await supabase.storage
-                    .from("profile-photos")
-                    .upload(filePath, file, { upsert: true });
-                  if (uploadError) {
-                    setError(uploadError.message);
-                    return;
-                  }
-                  const { data } = supabase.storage
-                    .from("profile-photos")
-                    .getPublicUrl(filePath);
-                  setProfilePhotoUrl(data.publicUrl);
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.addEventListener("load", () => {
+                    setImageSrc(reader.result as string);
+                    setCropOpen(true);
+                  });
+                  reader.readAsDataURL(file);
                 }}
                 className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"
               />
@@ -244,6 +257,91 @@ export default function SettingsPage() {
           </div>
         </section>
       </div>
+
+      {cropOpen && imageSrc ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
+            <div className="flex items-center justify-between">
+              <div className="text-xl font-semibold">Crop profile photo</div>
+              <button
+                onClick={() => {
+                  setCropOpen(false);
+                  setImageSrc(null);
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 relative h-[360px] w-full bg-black rounded-2xl overflow-hidden">
+              <Cropper
+                image={imageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
+            </div>
+
+            <div className="mt-4 flex items-center gap-4">
+              <div className="text-sm text-gray-400">Zoom</div>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.01}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                onClick={async () => {
+                  if (!croppedAreaPixels || !userId || !imageSrc) return;
+                  try {
+                    const blob = await getCroppedImageBlob(imageSrc, croppedAreaPixels);
+                    const filePath = `${userId}/${crypto.randomUUID()}.jpg`;
+                    const { error: uploadError } = await supabase.storage
+                      .from("profile-photos")
+                      .upload(filePath, blob, { upsert: true, contentType: "image/jpeg" });
+                    if (uploadError) {
+                      setError(uploadError.message);
+                      return;
+                    }
+                    const { data } = supabase.storage
+                      .from("profile-photos")
+                      .getPublicUrl(filePath);
+                    setProfilePhotoUrl(data.publicUrl);
+                    setCropOpen(false);
+                    setImageSrc(null);
+                  } catch (err: any) {
+                    setError(err?.message ?? "Failed to crop image");
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+              >
+                Save photo
+              </button>
+              <button
+                onClick={() => {
+                  setCropOpen(false);
+                  setImageSrc(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
