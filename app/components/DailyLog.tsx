@@ -659,73 +659,90 @@ export default function DailyLog({
               </div>
 
               {drinkingOpen ? (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label>Tier</Label>
-                    <div className="grid grid-cols-1 gap-2 text-sm">
-                      {[1, 2, 3].map((tier) => (
-                        <label
-                          key={tier}
-                          className="flex items-center gap-2 text-gray-300"
-                        >
-                          <input
-                            type="radio"
-                            name="drinking-tier"
-                            checked={drinkingTier === tier}
-                            onChange={() => setDrinkingTier(tier as 1 | 2 | 3)}
-                          />
-                          {tier === 1
-                            ? "Tier 1 — Major event"
-                            : tier === 2
-                              ? "Tier 2 — Social event"
-                              : "Tier 3 — Regular / casual"}
-                        </label>
-                      ))}
+                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
+                  <div className="w-full max-w-2xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xl font-semibold">Add drinking event</div>
+                      <button
+                        onClick={() => setDrinkingOpen(false)}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        Close
+                      </button>
                     </div>
-                  </div>
-                  <div>
-                    <Label>Drinks</Label>
-                    <Input
-                      inputMode="numeric"
-                      placeholder="0–20"
-                      defaultValue="0"
-                      ref={drinkingDrinksRef}
-                    />
-                  </div>
-                  <div>
-                    <Label>Note (optional)</Label>
-                    <Input
-                      placeholder="e.g., wedding"
-                      ref={drinkingNoteRef}
-                    />
-                  </div>
-                  <div className="md:col-span-3">
-                    <button
-                      onClick={async () => {
-                        const drinkValue = drinkingDrinksRef.current?.value ?? "0";
-                        const noteValue = drinkingNoteRef.current?.value ?? "";
-                        const drinks = Math.max(
-                          0,
-                          Math.min(20, Number(drinkValue) || 0)
-                        );
-                        const created = await createDrinkingEvent({
-                          user_id: userId,
-                          date: dateKey,
-                          tier: drinkingTier,
-                          drinks,
-                          note: noteValue.trim() || null,
-                        });
-                        if (created) {
-                          setDrinkingEvents((prev) => [...prev, created]);
-                          if (drinkingDrinksRef.current) drinkingDrinksRef.current.value = "0";
-                          if (drinkingNoteRef.current) drinkingNoteRef.current.value = "";
-                          setDrinkingOpen(false);
-                        }
-                      }}
-                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
-                    >
-                      Save drinking event
-                    </button>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label>Tier</Label>
+                        <div className="grid grid-cols-1 gap-2 text-sm">
+                          {[1, 2, 3].map((tier) => (
+                            <label
+                              key={tier}
+                              className="flex items-center gap-2 text-gray-300"
+                            >
+                              <input
+                                type="radio"
+                                name="drinking-tier"
+                                checked={drinkingTier === tier}
+                                onChange={() => setDrinkingTier(tier as 1 | 2 | 3)}
+                              />
+                              {tier === 1
+                                ? "Tier 1 — Major event"
+                                : tier === 2
+                                  ? "Tier 2 — Social event"
+                                  : "Tier 3 — Regular / casual"}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Drinks</Label>
+                        <Input
+                          inputMode="numeric"
+                          placeholder="0–20"
+                          defaultValue="0"
+                          ref={drinkingDrinksRef}
+                        />
+                      </div>
+                      <div>
+                        <Label>Note (optional)</Label>
+                        <Input placeholder="e.g., wedding" ref={drinkingNoteRef} />
+                      </div>
+                      <div className="md:col-span-3 flex items-center gap-3">
+                        <button
+                          onClick={async () => {
+                            const drinkValue = drinkingDrinksRef.current?.value ?? "0";
+                            const noteValue = drinkingNoteRef.current?.value ?? "";
+                            const drinks = Math.max(
+                              0,
+                              Math.min(20, Number(drinkValue) || 0)
+                            );
+                            const created = await createDrinkingEvent({
+                              user_id: userId,
+                              date: dateKey,
+                              tier: drinkingTier,
+                              drinks,
+                              note: noteValue.trim() || null,
+                            });
+                            if (created) {
+                              setDrinkingEvents((prev) => [...prev, created]);
+                              if (drinkingDrinksRef.current) drinkingDrinksRef.current.value = "0";
+                              if (drinkingNoteRef.current) drinkingNoteRef.current.value = "";
+                              setDrinkingOpen(false);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                        >
+                          Save drinking event
+                        </button>
+                        <button
+                          onClick={() => setDrinkingOpen(false)}
+                          className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : null}
