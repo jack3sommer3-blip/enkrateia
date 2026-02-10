@@ -1180,7 +1180,6 @@ export default function DailyLog({
           </Card>
         </div>
       </div>
-    </div>
   );
 
   if (embedded) {
