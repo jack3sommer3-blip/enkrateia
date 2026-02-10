@@ -121,6 +121,23 @@ export type FeedItem = {
   metadata: Record<string, unknown>;
 };
 
+export type ActivityItem = {
+  id: string;
+  user_id: string;
+  event_type: "workout" | "reading" | "drinking";
+  event_id: string;
+  event_date: string;
+  created_at: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  feed_item_id?: string;
+  profile?: {
+    username?: string | null;
+    display_name?: string | null;
+    profile_photo_url?: string | null;
+  };
+};
+
 export type Like = {
   user_id: string;
   feed_item_id: string;

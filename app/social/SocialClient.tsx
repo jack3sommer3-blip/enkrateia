@@ -10,26 +10,20 @@ import { getProfile } from "@/lib/profile";
 import {
   addComment,
   backfillFeedItemsForUser,
-  getFeed,
+  getActivityDebug,
+  getFeedActivityStream,
   getLikesForFeed,
   listComments,
   listFollowers,
   listFollowing,
   searchUsers,
   toggleLike,
+  followUser,
+  unfollowUser,
 } from "@/lib/social";
-import type { Comment, Like, Profile } from "@/lib/types";
+import type { Comment, Like, Profile, ActivityItem } from "@/lib/types";
 
 const TABS = ["Feed", "Search", "Profile"] as const;
-
-type FeedRow = {
-  id: string;
-  user_id: string;
-  created_at: string;
-  event_type: string;
-  summary: string;
-  profiles?: { username: string; display_name: string; profile_photo_url: string | null };
-};
 
 export default function SocialClient() {
   const { loading, userId } = useSession();
@@ -44,7 +38,8 @@ export default function SocialClient() {
   );
 
   const [profile, setProfile] = useState<Profile | undefined>();
-  const [feed, setFeed] = useState<FeedRow[]>([]);
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [selfItems, setSelfItems] = useState<ActivityItem[]>([]);
   const [likes, setLikes] = useState<Record<string, Like[]>>({});
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
@@ -57,6 +52,9 @@ export default function SocialClient() {
 
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+  const [debugInfo, setDebugInfo] = useState<Awaited<ReturnType<typeof getActivityDebug>> | null>(null);
+  const [activityErrors, setActivityErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (!userId) return;
@@ -67,14 +65,26 @@ export default function SocialClient() {
     if (!userId) return;
     let active = true;
     const load = async () => {
-      await backfillFeedItemsForUser(userId);
+      const backfill = await backfillFeedItemsForUser(userId);
       const rows: any[] = await listFollowing(userId);
       const followingIds = rows.map((row) => row.following_id);
-      const ids = Array.from(new Set([userId, ...followingIds]));
-      const items: any[] = await getFeed(ids);
+      const followMap: Record<string, boolean> = {};
+      rows.forEach((row) => {
+        followMap[row.following_id] = true;
+      });
+      if (active) setFollowingMap(followMap);
+
+      const { items, errors } = await getFeedActivityStream(userId, followingIds);
       if (!active) return;
-      setFeed(items);
-      const likesList = await getLikesForFeed(items.map((item) => item.id));
+      setActivityItems(items);
+      setSelfItems(items.filter((item) => item.user_id === userId));
+      const combinedErrors = backfill.ok
+        ? errors
+        : [...errors, backfill.error ?? "Backfill failed"];
+      setActivityErrors(combinedErrors);
+
+      const feedIds = items.map((item) => item.feed_item_id).filter(Boolean) as string[];
+      const likesList = await getLikesForFeed(feedIds);
       if (!active) return;
       const grouped: Record<string, Like[]> = {};
       likesList.forEach((like) => {
@@ -98,6 +108,13 @@ export default function SocialClient() {
     listFollowers(profile.id).then((rows) => setFollowersCount(rows.length));
     listFollowing(profile.id).then((rows) => setFollowingCount(rows.length));
   }, [profile?.id]);
+
+  useEffect(() => {
+    const debugEnabled =
+      process.env.NODE_ENV !== "production" || searchParams.get("debug") === "1";
+    if (!debugEnabled || !userId) return;
+    getActivityDebug(userId).then(setDebugInfo);
+  }, [searchParams, userId]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -141,26 +158,36 @@ export default function SocialClient() {
 
         {activeTab === "Feed" ? (
           <section className="mt-6 space-y-4">
-            {feed.length === 0 ? (
+            {activityItems.length === 0 ? (
               <div className="text-gray-500">No activity yet.</div>
             ) : (
-              feed.map((item) => (
-                <div key={item.id} className="command-surface rounded-md p-5 fade-up">
+              activityItems.map((item) => {
+                const profileInfo =
+                  item.profile ||
+                  (item.user_id === userId
+                    ? {
+                        username: profile?.username,
+                        display_name: displayName,
+                        profile_photo_url: profile?.profile_photo_url ?? null,
+                      }
+                    : undefined);
+                return (
+                <div key={`${item.user_id}-${item.event_type}-${item.event_id}`} className="command-surface rounded-md p-5 fade-up">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-800 border border-white/10 overflow-hidden">
-                      {item.profiles?.profile_photo_url ? (
+                      {profileInfo?.profile_photo_url ? (
                         <img
-                          src={item.profiles.profile_photo_url}
-                          alt={item.profiles.display_name ?? item.profiles.username}
+                          src={profileInfo.profile_photo_url}
+                          alt={profileInfo.display_name ?? profileInfo.username ?? "User"}
                           className="w-full h-full object-cover"
                         />
                       ) : null}
                     </div>
                     <div>
                       <div className="text-white">
-                        {item.profiles?.display_name ?? item.profiles?.username ?? "User"}
+                        {profileInfo?.display_name ?? profileInfo?.username ?? "User"}
                       </div>
-                      <div className="text-gray-400 text-sm">@{item.profiles?.username ?? ""}</div>
+                      <div className="text-gray-400 text-sm">@{profileInfo?.username ?? ""}</div>
                     </div>
                   </div>
 
@@ -169,62 +196,78 @@ export default function SocialClient() {
                     {new Date(item.created_at).toLocaleString()}
                   </div>
 
-                  <div className="mt-3 flex items-center gap-6 text-xs uppercase tracking-[0.2em] text-gray-500">
-                    <button
-                      onClick={async () => {
-                        if (!userId) return;
-                        const res = await toggleLike(item.id, !!liked[item.id], userId);
-                        if (res || res === false) {
-                          setLiked((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
-                          setLikes((prev) => {
-                            const current = prev[item.id] ?? [];
-                            if (liked[item.id]) {
+                  {item.feed_item_id ? (
+                    <div className="mt-3 flex items-center gap-6 text-xs uppercase tracking-[0.2em] text-gray-500">
+                      <button
+                        onClick={async () => {
+                          if (!userId || !item.feed_item_id) return;
+                          const res = await toggleLike(
+                            item.feed_item_id,
+                            !!liked[item.feed_item_id],
+                            userId
+                          );
+                          if (res || res === false) {
+                            setLiked((prev) => ({
+                              ...prev,
+                              [item.feed_item_id as string]: !prev[item.feed_item_id as string],
+                            }));
+                            setLikes((prev) => {
+                              const current = prev[item.feed_item_id as string] ?? [];
+                              if (liked[item.feed_item_id as string]) {
+                                return {
+                                  ...prev,
+                                  [item.feed_item_id as string]: current.filter(
+                                    (like) => like.user_id !== userId
+                                  ),
+                                };
+                              }
                               return {
                                 ...prev,
-                                [item.id]: current.filter((like) => like.user_id !== userId),
+                                [item.feed_item_id as string]: [
+                                  ...current,
+                                  { user_id: userId, feed_item_id: item.feed_item_id as string },
+                                ],
                               };
-                            }
-                            return {
-                              ...prev,
-                              [item.id]: [
-                                ...current,
-                                { user_id: userId, feed_item_id: item.id },
-                              ],
-                            };
-                          });
-                        }
-                      }}
-                      className="hover:text-white"
-                    >
-                      {liked[item.id] ? "Unlike" : "Like"} • {likes[item.id]?.length ?? 0}
-                    </button>
-                    <button
-                      onClick={async () => {
-                        const existing = comments[item.id];
-                        if (existing) return;
-                        const list = await listComments(item.id);
-                        setComments((prev) => ({ ...prev, [item.id]: list }));
-                      }}
-                      className="hover:text-white"
-                    >
-                      Comments • {comments[item.id]?.length ?? 0}
-                    </button>
-                  </div>
+                            });
+                          }
+                        }}
+                        className="hover:text-white"
+                      >
+                        {liked[item.feed_item_id] ? "Unlike" : "Like"} •{" "}
+                        {likes[item.feed_item_id]?.length ?? 0}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!item.feed_item_id) return;
+                          const existing = comments[item.feed_item_id];
+                          if (existing) return;
+                          const list = await listComments(item.feed_item_id);
+                          setComments((prev) => ({ ...prev, [item.feed_item_id as string]: list }));
+                        }}
+                        className="hover:text-white"
+                      >
+                        Comments • {comments[item.feed_item_id]?.length ?? 0}
+                      </button>
+                    </div>
+                  ) : null}
 
-                  {comments[item.id] ? (
+                  {item.feed_item_id && comments[item.feed_item_id] ? (
                     <div className="mt-4 space-y-2">
-                      {comments[item.id].map((comment) => (
-                        <div key={comment.id} className="text-sm text-gray-300 flex items-center justify-between">
+                      {comments[item.feed_item_id].map((comment) => (
+                        <div
+                          key={comment.id}
+                          className="text-sm text-gray-300 flex items-center justify-between"
+                        >
                           <span>{comment.body}</span>
                         </div>
                       ))}
                       <div className="flex gap-2">
                         <input
-                          value={commentBodies[item.id] ?? ""}
+                          value={commentBodies[item.feed_item_id] ?? ""}
                           onChange={(e) =>
                             setCommentBodies((prev) => ({
                               ...prev,
-                              [item.id]: e.target.value,
+                              [item.feed_item_id as string]: e.target.value,
                             }))
                           }
                           className="flex-1 px-3 py-2 rounded-md bg-black/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/10"
@@ -232,16 +275,22 @@ export default function SocialClient() {
                         />
                         <button
                           onClick={async () => {
-                            if (!userId) return;
-                            const body = commentBodies[item.id]?.trim();
+                            if (!userId || !item.feed_item_id) return;
+                            const body = commentBodies[item.feed_item_id]?.trim();
                             if (!body) return;
-                            const created = await addComment(item.id, body, userId);
+                            const created = await addComment(item.feed_item_id, body, userId);
                             if (created) {
                               setComments((prev) => ({
                                 ...prev,
-                                [item.id]: [...(prev[item.id] ?? []), created],
+                                [item.feed_item_id as string]: [
+                                  ...(prev[item.feed_item_id as string] ?? []),
+                                  created,
+                                ],
                               }));
-                              setCommentBodies((prev) => ({ ...prev, [item.id]: "" }));
+                              setCommentBodies((prev) => ({
+                                ...prev,
+                                [item.feed_item_id as string]: "",
+                              }));
                             }
                           }}
                           className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20"
@@ -252,8 +301,29 @@ export default function SocialClient() {
                     </div>
                   ) : null}
                 </div>
-              ))
+              )})
             )}
+            {(process.env.NODE_ENV !== "production" ||
+              searchParams.get("debug") === "1") && debugInfo ? (
+              <div className="command-surface rounded-md p-4 text-xs text-gray-400">
+                <div className="text-gray-300 mb-2">Debug</div>
+                <div>User: {debugInfo.userId}</div>
+                <div>Workouts (7d): {debugInfo.workoutCount7d}</div>
+                <div>Reading (7d): {debugInfo.readingCount7d}</div>
+                <div>Drinking (7d): {debugInfo.drinkingCount7d}</div>
+                <div>Feed items (30d): {debugInfo.feedItemsCount30d}</div>
+                {activityErrors.length > 0 ? (
+                  <div className="mt-2 text-rose-300">
+                    Errors: {activityErrors.join(" | ")}
+                  </div>
+                ) : null}
+                {debugInfo.errors.length > 0 ? (
+                  <div className="mt-2 text-rose-300">
+                    Debug errors: {debugInfo.errors.join(" | ")}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         ) : null}
 
@@ -266,21 +336,21 @@ export default function SocialClient() {
                 placeholder="Search by username"
                 className="w-full px-4 py-3 rounded-md bg-black/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/10"
               />
-              <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
+              <div className="text-sm uppercase tracking-[0.3em] text-gray-500 mt-5">
                 Results
               </div>
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 divide-y divide-white/10">
                 {!query.trim() ? (
-                  <div className="text-gray-500">Start typing to search users.</div>
+                  <div className="text-gray-500 py-6">Start typing to search users.</div>
                 ) : loadingResults ? (
                   <div className="text-gray-500">Searching…</div>
                 ) : results.length === 0 ? (
-                  <div className="text-gray-500">No users found.</div>
+                  <div className="text-gray-500 py-6">No users found.</div>
                 ) : (
                   results.map((result) => (
                     <div
                       key={result.id}
-                      className="flex items-center justify-between p-4 rounded-md border border-white/10 bg-black/40"
+                      className="flex items-center justify-between py-4 hover:bg-white/5 transition"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gray-800 border border-white/10 overflow-hidden">
@@ -302,6 +372,30 @@ export default function SocialClient() {
                           <div className="text-gray-400 text-sm">@{result.username}</div>
                         </div>
                       </div>
+                      {userId && userId !== result.id ? (
+                        <button
+                          onClick={async () => {
+                            if (followingMap[result.id]) {
+                              const ok = await unfollowUser(userId, result.id);
+                              if (ok)
+                                setFollowingMap((prev) => ({
+                                  ...prev,
+                                  [result.id]: false,
+                                }));
+                            } else {
+                              const res = await followUser(userId, result.id);
+                              if (res)
+                                setFollowingMap((prev) => ({
+                                  ...prev,
+                                  [result.id]: true,
+                                }));
+                            }
+                          }}
+                          className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+                        >
+                          {followingMap[result.id] ? "Unfollow" : "Follow"}
+                        </button>
+                      ) : null}
                     </div>
                   ))
                 )}
@@ -356,14 +450,12 @@ export default function SocialClient() {
                   Activity
                 </div>
                 <div className="mt-4 space-y-3">
-                  {feed.filter((item) => item.user_id === userId).length === 0 ? (
+                  {selfItems.length === 0 ? (
                     <div className="text-gray-500">No activity yet.</div>
                   ) : (
-                    feed
-                      .filter((item) => item.user_id === userId)
-                      .map((item) => (
+                    selfItems.map((item) => (
                         <div
-                          key={item.id}
+                          key={`${item.user_id}-${item.event_type}-${item.event_id}`}
                           className="rounded-md border border-white/10 bg-black/40 px-4 py-3"
                         >
                           <div className="text-white font-semibold">{item.summary}</div>
@@ -382,6 +474,27 @@ export default function SocialClient() {
                 <div className="mt-4 text-gray-500">Badges coming soon.</div>
               </div>
             </div>
+            {(process.env.NODE_ENV !== "production" ||
+              searchParams.get("debug") === "1") && debugInfo ? (
+              <div className="command-surface rounded-md p-4 text-xs text-gray-400 mt-6">
+                <div className="text-gray-300 mb-2">Debug</div>
+                <div>User: {debugInfo.userId}</div>
+                <div>Workouts (7d): {debugInfo.workoutCount7d}</div>
+                <div>Reading (7d): {debugInfo.readingCount7d}</div>
+                <div>Drinking (7d): {debugInfo.drinkingCount7d}</div>
+                <div>Feed items (30d): {debugInfo.feedItemsCount30d}</div>
+                {activityErrors.length > 0 ? (
+                  <div className="mt-2 text-rose-300">
+                    Errors: {activityErrors.join(" | ")}
+                  </div>
+                ) : null}
+                {debugInfo.errors.length > 0 ? (
+                  <div className="mt-2 text-rose-300">
+                    Debug errors: {debugInfo.errors.join(" | ")}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         ) : null}
       </div>

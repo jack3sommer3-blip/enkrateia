@@ -1,5 +1,15 @@
 import { supabase } from "@/lib/supabase";
-import type { Comment, FeedItem, Follow, Like, Profile, DayData, ReadingEvent, WorkoutActivity } from "@/lib/types";
+import type {
+  Comment,
+  FeedItem,
+  Follow,
+  Like,
+  Profile,
+  DayData,
+  ReadingEvent,
+  WorkoutActivity,
+  ActivityItem,
+} from "@/lib/types";
 import { addDays, intFromText, toDateKey } from "@/lib/utils";
 
 export async function searchUsers(query: string) {
@@ -160,7 +170,10 @@ function readingSummary(event: ReadingEvent) {
   return event.title ? `${base} • ${event.title}` : base;
 }
 
-export async function backfillFeedItemsForUser(userId: string, days = 30) {
+export async function backfillFeedItemsForUser(
+  userId: string,
+  days = 30
+): Promise<{ ok: boolean; error?: string }> {
   const start = addDays(new Date(), -(Math.max(days, 1) - 1));
   const startKey = toDateKey(start);
 
@@ -170,7 +183,7 @@ export async function backfillFeedItemsForUser(userId: string, days = 30) {
     .eq("user_id", userId)
     .gte("date", startKey);
 
-  if (logsError) return false;
+  if (logsError) return { ok: false, error: logsError.message };
 
   const items: Array<{
     user_id: string;
@@ -267,13 +280,14 @@ export async function backfillFeedItemsForUser(userId: string, days = 30) {
     });
   }
 
-  if (items.length === 0) return true;
+  if (items.length === 0) return { ok: true };
 
   const { error: upsertError } = await supabase
     .from("feed_items")
     .upsert(items, { onConflict: "user_id,event_type,event_id" });
 
-  return !upsertError;
+  if (upsertError) return { ok: false, error: upsertError.message };
+  return { ok: true };
 }
 
 export async function updateFeedItemByEvent(
@@ -355,4 +369,252 @@ export async function getLikesForFeed(feedItemIds: string[]) {
     .in("feed_item_id", feedItemIds);
   if (error) return [];
   return (data ?? []) as Like[];
+}
+
+type ActivityDebug = {
+  userId: string;
+  workoutCount7d: number;
+  readingCount7d: number;
+  drinkingCount7d: number;
+  feedItemsCount30d: number;
+  errors: string[];
+};
+
+function makeCreatedAt(dateKey: string) {
+  return `${dateKey}T12:00:00.000Z`;
+}
+
+function activityFromWorkout(
+  userId: string,
+  dateKey: string,
+  activity: WorkoutActivity,
+  index: number
+): ActivityItem {
+  const eventId = ensureUuid(activity.id, `${dateKey}-workout-${index}`);
+  return {
+    id: eventId,
+    user_id: userId,
+    event_type: "workout",
+    event_id: eventId,
+    event_date: dateKey,
+    created_at: makeCreatedAt(dateKey),
+    summary: workoutSummary(activity) || "Workout",
+    metadata: {
+      activityType: activity.type,
+      minutes: activity.minutesText,
+      seconds: activity.secondsText,
+      calories: activity.caloriesText,
+      intensity: activity.intensityText,
+    },
+  };
+}
+
+function activityFromReading(
+  userId: string,
+  dateKey: string,
+  event: ReadingEvent,
+  index: number
+): ActivityItem {
+  const eventId = ensureUuid(event.id, `${dateKey}-reading-${index}`);
+  return {
+    id: eventId,
+    user_id: userId,
+    event_type: "reading",
+    event_id: eventId,
+    event_date: dateKey,
+    created_at: makeCreatedAt(dateKey),
+    summary: readingSummary(event) || "Reading",
+    metadata: {
+      title: event.title,
+      pages: event.pages,
+      fiction_pages: event.fictionPages,
+      nonfiction_pages: event.nonfictionPages,
+      quote: event.quote,
+    },
+  };
+}
+
+export async function getSelfActivityStream(
+  userId: string,
+  days = 30
+): Promise<{ items: ActivityItem[]; errors: string[] }> {
+  const start = addDays(new Date(), -(Math.max(days, 1) - 1));
+  const startKey = toDateKey(start);
+  const errors: string[] = [];
+
+  const { data: logs, error: logsError } = await supabase
+    .from("daily_logs")
+    .select("date,data")
+    .eq("user_id", userId)
+    .gte("date", startKey);
+
+  if (logsError) errors.push(logsError.message);
+
+  const items: ActivityItem[] = [];
+
+  (logs ?? []).forEach((row: { date: string; data: DayData }) => {
+    const data = row.data;
+    const dateKey = row.date;
+
+    const activities = data?.workouts?.activities ?? [];
+    activities.forEach((activity, index) => {
+      items.push(activityFromWorkout(userId, dateKey, activity, index));
+    });
+
+    const readingEvents = data?.reading?.events ?? [];
+    if (readingEvents.length > 0) {
+      readingEvents.forEach((event, index) => {
+        items.push(activityFromReading(userId, dateKey, event, index));
+      });
+    } else if (data?.reading?.title || data?.reading?.pagesText) {
+      const pages = intFromText(data.reading.pagesText) ?? 0;
+      const eventId = stableUuid(`${dateKey}-reading-legacy`);
+      items.push({
+        id: eventId,
+        user_id: userId,
+        event_type: "reading",
+        event_id: eventId,
+        event_date: dateKey,
+        created_at: makeCreatedAt(dateKey),
+        summary: readingSummary({
+          id: eventId,
+          title: data.reading.title,
+          pages,
+        }),
+        metadata: { title: data.reading.title, pages },
+      });
+    }
+  });
+
+  const { data: drinkingEvents, error: drinkingError } = await supabase
+    .from("drinking_events")
+    .select("id, date, tier, drinks, note, created_at")
+    .eq("user_id", userId)
+    .gte("date", startKey);
+
+  if (drinkingError) {
+    errors.push(drinkingError.message);
+  } else if (drinkingEvents) {
+    drinkingEvents.forEach((event: any) => {
+      items.push({
+        id: event.id,
+        user_id: userId,
+        event_type: "drinking",
+        event_id: event.id,
+        event_date: event.date,
+        created_at: event.created_at ?? makeCreatedAt(event.date),
+        summary: `Tier ${event.tier} • ${event.drinks} drinks`,
+        metadata: { tier: event.tier, drinks: event.drinks, note: event.note },
+      });
+    });
+  }
+
+  items.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  return { items, errors };
+}
+
+export async function getFeedActivityStream(
+  userId: string,
+  followedIds: string[],
+  days = 30
+): Promise<{ items: ActivityItem[]; errors: string[] }> {
+  const errors: string[] = [];
+  const start = addDays(new Date(), -(Math.max(days, 1) - 1));
+  const startIso = start.toISOString();
+  const { items: selfItems, errors: selfErrors } = await getSelfActivityStream(
+    userId,
+    days
+  );
+  errors.push(...selfErrors);
+
+  const allIds = Array.from(new Set([userId, ...followedIds]));
+  const { data: feedItems, error: feedError } = await supabase
+    .from("feed_items")
+    .select(
+      "id, user_id, created_at, event_date, event_type, event_id, summary, metadata, profiles:user_id(username, display_name, profile_photo_url)"
+    )
+    .in("user_id", allIds)
+    .gte("created_at", startIso)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (feedError) errors.push(feedError.message);
+
+  const feedActivity: ActivityItem[] = (feedItems ?? [])
+    .filter((item: any) => item.user_id !== userId)
+    .map((item: any) => ({
+      id: item.id,
+      user_id: item.user_id,
+      event_type: item.event_type,
+      event_id: item.event_id,
+      event_date: item.event_date,
+      created_at: item.created_at,
+      summary: item.summary,
+      metadata: item.metadata ?? {},
+      feed_item_id: item.id,
+      profile: item.profiles ?? undefined,
+    }));
+
+  const feedMap = new Map<string, string>();
+  (feedItems ?? []).forEach((item: any) => {
+    const key = `${item.user_id}:${item.event_type}:${item.event_id}`;
+    feedMap.set(key, item.id);
+  });
+
+  const selfWithFeed = selfItems.map((item) => {
+    const key = `${item.user_id}:${item.event_type}:${item.event_id}`;
+    const feedId = feedMap.get(key);
+    return feedId ? { ...item, feed_item_id: feedId } : item;
+  });
+
+  const selfFromFeed = selfItems.length === 0
+    ? (feedItems ?? [])
+        .filter((item: any) => item.user_id === userId)
+        .map((item: any) => ({
+          id: item.id,
+          user_id: item.user_id,
+          event_type: item.event_type,
+          event_id: item.event_id,
+          event_date: item.event_date,
+          created_at: item.created_at,
+          summary: item.summary,
+          metadata: item.metadata ?? {},
+          feed_item_id: item.id,
+        }))
+    : [];
+
+  const items = [...selfWithFeed, ...selfFromFeed, ...feedActivity];
+  items.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
+  return { items, errors };
+}
+
+export async function getActivityDebug(userId: string): Promise<ActivityDebug> {
+  const errors: string[] = [];
+  const { items: last7Items, errors: itemErrors } = await getSelfActivityStream(userId, 7);
+  errors.push(...itemErrors);
+
+  const workoutCount7d = last7Items.filter((i) => i.event_type === "workout").length;
+  const readingCount7d = last7Items.filter((i) => i.event_type === "reading").length;
+  const drinkingCount7d = last7Items.filter((i) => i.event_type === "drinking").length;
+
+  const start30 = addDays(new Date(), -29);
+  const start30Key = toDateKey(start30);
+
+  const { count: feedCount, error: feedError } = await supabase
+    .from("feed_items")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("event_date", start30Key);
+
+  if (feedError) errors.push(feedError.message);
+
+  return {
+    userId,
+    workoutCount7d,
+    readingCount7d,
+    drinkingCount7d,
+    feedItemsCount30d: feedCount ?? 0,
+    errors,
+  };
 }
