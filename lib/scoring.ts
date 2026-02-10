@@ -1,8 +1,12 @@
-import { DayData, DayScore, Goals } from "@/lib/types";
+import { DayData, DayScore, Goals, DrinkingEvent } from "@/lib/types";
 import { computeCategoryScore, getDefaultGoals, normalizeGoals } from "@/lib/goals";
 import { clampInt, intFromText, numFromText } from "@/lib/utils";
 
-export function computeScores(data: DayData, goalsInput?: Goals | null): DayScore {
+export function computeScores(
+  data: DayData,
+  goalsInput?: Goals | null,
+  drinkingEvents: DrinkingEvent[] = []
+): DayScore {
   const defaultGoals = getDefaultGoals();
   const goals = normalizeGoals(goalsInput);
   const totalWorkoutMinutes = data.workouts.activities.reduce((sum, a) => {
@@ -72,7 +76,10 @@ export function computeScores(data: DayData, goalsInput?: Goals | null): DayScor
 
   const workoutScore = exerciseRatio * 25;
   const sleepScore = sleepRatio * 25;
-  const dietScore = dietRatio * 25;
+  const dietScoreBase100 = dietRatio * 100;
+  const penalty = calculateAlcoholPenalty(drinkingEvents);
+  const dietScoreFinal100 = Math.max(0, dietScoreBase100 - penalty.total);
+  const dietScore = (dietScoreFinal100 / 100) * 25;
   const readingScore = readingRatio * 25;
 
   return {
@@ -81,5 +88,38 @@ export function computeScores(data: DayData, goalsInput?: Goals | null): DayScor
     sleepScore,
     dietScore,
     readingScore,
+    dietScoreBase100,
+    dietScoreFinal100,
+    dietPenaltyTotal: penalty.total,
+    dietPenaltyTier2: penalty.tier2,
+    dietPenaltyTier3: penalty.tier3,
+  };
+}
+
+function calculateAlcoholPenalty(events: DrinkingEvent[]) {
+  let tier2Drinks = 0;
+  let tier3Drinks = 0;
+
+  events.forEach((event) => {
+    if (event.tier === 2) tier2Drinks += event.drinks;
+    if (event.tier === 3) tier3Drinks += event.drinks;
+  });
+
+  const tier2Over = Math.max(0, tier2Drinks - 3);
+  const tier2Penalty = tier2Over * 5;
+
+  let tier3Penalty = 0;
+  if (tier3Drinks <= 3) {
+    tier3Penalty = tier3Drinks * 3;
+  } else {
+    tier3Penalty = 3 * 3 + (tier3Drinks - 3) * 7;
+  }
+
+  return {
+    total: tier2Penalty + tier3Penalty,
+    tier2: tier2Penalty,
+    tier3: tier3Penalty,
+    tier2Drinks,
+    tier3Drinks,
   };
 }

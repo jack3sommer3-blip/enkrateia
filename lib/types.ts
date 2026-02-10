@@ -48,6 +48,11 @@ export type DayScore = {
   sleepScore: number;
   dietScore: number;
   readingScore: number;
+  dietScoreBase100: number;
+  dietScoreFinal100: number;
+  dietPenaltyTotal: number;
+  dietPenaltyTier2: number;
+  dietPenaltyTier3: number;
 };
 
 export type Profile = {
@@ -73,4 +78,14 @@ export type Goals = {
   sleep: GoalCategory;
   diet: GoalCategory;
   reading: GoalCategory;
+};
+
+export type DrinkingEvent = {
+  id: string;
+  user_id: string;
+  date: string;
+  tier: 1 | 2 | 3;
+  drinks: number;
+  note?: string | null;
+  created_at?: string | null;
 };

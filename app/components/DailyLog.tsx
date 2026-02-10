@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Nav from "@/app/components/Nav";
 import { supabase } from "@/lib/supabase";
-import { DayData, ActivityType, WorkoutActivity } from "@/lib/types";
+import { DayData, ActivityType, WorkoutActivity, DrinkingEvent } from "@/lib/types";
 import { computeScores } from "@/lib/scoring";
 import { getDefaultGoals, normalizeGoals } from "@/lib/goals";
+import { createDrinkingEvent, deleteDrinkingEvent, listDrinkingEvents } from "@/lib/drinking";
 import {
   clampInt,
   formatScore,
@@ -51,6 +52,11 @@ export default function DailyLog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [goals, setGoals] = useState(getDefaultGoals());
+  const [drinkingEvents, setDrinkingEvents] = useState<DrinkingEvent[]>([]);
+  const [drinkingOpen, setDrinkingOpen] = useState(false);
+  const [drinkingTier, setDrinkingTier] = useState<1 | 2 | 3>(2);
+  const [drinkingDrinks, setDrinkingDrinks] = useState("0");
+  const [drinkingNote, setDrinkingNote] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -139,11 +145,22 @@ export default function DailyLog({
   }, [userId]);
 
   useEffect(() => {
+    let mounted = true;
+    listDrinkingEvents(userId, dateKey).then((events) => {
+      if (!mounted) return;
+      setDrinkingEvents(events);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [userId, dateKey]);
+
+  useEffect(() => {
     if (!hydrated) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
 
     saveTimer.current = setTimeout(async () => {
-      const scores = computeScores(data, goals);
+      const scores = computeScores(data, goals, drinkingEvents);
       const payload = {
         user_id: userId,
         date: dateKey,
@@ -186,7 +203,7 @@ export default function DailyLog({
   const restaurantMeals = intFromText(data.diet.restaurantMealsText) ?? 0;
   const totalMeals = cookedMeals + restaurantMeals;
   const pagesRead = intFromText(data.reading.pagesText) ?? 0;
-  const scores = computeScores(data, goals);
+  const scores = computeScores(data, goals, drinkingEvents);
   const formKey = `${dateKey}-${hydrated ? "ready" : "loading"}`;
 
   const completedCount =
@@ -553,7 +570,7 @@ export default function DailyLog({
             subtitle="Earn up to 25 points based on your goals."
             hint={`Cooked: ${cookedMeals}  •  Restaurant: ${restaurantMeals}  •  Score: ${formatScore(
               scores.dietScore
-            )}/25`}
+            )}/25${scores.dietPenaltyTotal > 0 ? `  •  Alcohol penalty: -${scores.dietPenaltyTotal}` : ""}`}
             earned={scores.dietScore >= 25}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -623,6 +640,120 @@ export default function DailyLog({
                     }));
                   }}
                 />
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 rounded-2xl border border-gray-800 bg-black">
+              <div className="flex items-center justify-between">
+                <div className="text-lg font-semibold">Drinking</div>
+                <button
+                  onClick={() => setDrinkingOpen((prev) => !prev)}
+                  className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition text-sm"
+                >
+                  {drinkingOpen ? "Close" : "Add drinking event"}
+                </button>
+              </div>
+
+              {drinkingOpen ? (
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label>Tier</Label>
+                    <div className="grid grid-cols-1 gap-2 text-sm">
+                      {[1, 2, 3].map((tier) => (
+                        <label
+                          key={tier}
+                          className="flex items-center gap-2 text-gray-300"
+                        >
+                          <input
+                            type="radio"
+                            name="drinking-tier"
+                            checked={drinkingTier === tier}
+                            onChange={() => setDrinkingTier(tier as 1 | 2 | 3)}
+                          />
+                          {tier === 1
+                            ? "Tier 1 — Major event"
+                            : tier === 2
+                              ? "Tier 2 — Social event"
+                              : "Tier 3 — Regular / casual"}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Drinks</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="0–20"
+                      value={drinkingDrinks}
+                      onChange={(e) => setDrinkingDrinks(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Note (optional)</Label>
+                    <Input
+                      placeholder="e.g., wedding"
+                      value={drinkingNote}
+                      onChange={(e) => setDrinkingNote(e.target.value)}
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <button
+                      onClick={async () => {
+                        const drinks = Math.max(
+                          0,
+                          Math.min(20, Number(drinkingDrinks) || 0)
+                        );
+                        const created = await createDrinkingEvent({
+                          user_id: userId,
+                          date: dateKey,
+                          tier: drinkingTier,
+                          drinks,
+                          note: drinkingNote.trim() || null,
+                        });
+                        if (created) {
+                          setDrinkingEvents((prev) => [...prev, created]);
+                          setDrinkingDrinks("0");
+                          setDrinkingNote("");
+                          setDrinkingOpen(false);
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                    >
+                      Save drinking event
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-4 space-y-2">
+                {drinkingEvents.length === 0 ? (
+                  <div className="text-gray-500 text-sm">No drinking events yet.</div>
+                ) : (
+                  drinkingEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex items-center justify-between rounded-xl border border-gray-800 bg-gray-900 px-4 py-2 text-sm"
+                    >
+                      <div className="text-gray-200">
+                        Tier {event.tier} • {event.drinks} drinks
+                        {event.note ? ` • ${event.note}` : ""}
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const ok = await deleteDrinkingEvent(event.id);
+                          if (ok) {
+                            setDrinkingEvents((prev) =>
+                              prev.filter((item) => item.id !== event.id)
+                            );
+                          }
+                        }}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </Card>
