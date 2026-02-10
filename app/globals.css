@@ -7,7 +7,11 @@
   --border: rgba(255, 255, 255, 0.08);
   --text: #e5e7eb;
   --text-muted: #94a3b8;
-  --accent: #22c55e;
+  --accent: #1f7a4f;
+  --accent-10: rgba(31, 122, 79, 0.1);
+  --accent-20: rgba(31, 122, 79, 0.2);
+  --accent-40: rgba(31, 122, 79, 0.4);
+  --accent-60: rgba(31, 122, 79, 0.6);
   --accent-blue: #38bdf8;
   --danger: #ef4444;
 }
@@ -42,6 +46,11 @@ main {
   background: var(--surface-elevated);
   border: 1px solid var(--border);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.accent-underline {
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(31, 122, 79, 0.45);
 }
 
 .command-grid::before {

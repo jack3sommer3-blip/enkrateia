@@ -205,7 +205,7 @@ export default function SettingsPage() {
                   type="checkbox"
                   checked={isPublic}
                   onChange={(e) => setIsPublic(e.target.checked)}
-                  className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-emerald-500 checked:border-emerald-400 transition"
+                  className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-[color:var(--accent)] checked:border-[color:var(--accent-60)] transition"
                 />
                 Public profile
               </label>
@@ -215,7 +215,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={showWorkouts}
                     onChange={(e) => setShowWorkouts(e.target.checked)}
-                    className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-emerald-500 checked:border-emerald-400 transition"
+                    className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-[color:var(--accent)] checked:border-[color:var(--accent-60)] transition"
                   />
                   Show workouts
                 </label>
@@ -224,7 +224,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={showReading}
                     onChange={(e) => setShowReading(e.target.checked)}
-                    className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-emerald-500 checked:border-emerald-400 transition"
+                    className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-[color:var(--accent)] checked:border-[color:var(--accent-60)] transition"
                   />
                   Show reading
                 </label>
@@ -233,7 +233,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={showDrinking}
                     onChange={(e) => setShowDrinking(e.target.checked)}
-                    className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-emerald-500 checked:border-emerald-400 transition"
+                    className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-[color:var(--accent)] checked:border-[color:var(--accent-60)] transition"
                   />
                   Show drinking
                 </label>
@@ -256,7 +256,7 @@ export default function SettingsPage() {
             <button
               onClick={saveProfile}
               disabled={saving}
-              className="px-4 py-2 rounded-md border border-emerald-500/60 text-emerald-300 hover:text-white hover:border-emerald-400 transition disabled:opacity-50"
+              className="px-4 py-2 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:text-white hover:border-[color:var(--accent)] transition disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save changes"}
             </button>
@@ -332,7 +332,7 @@ export default function SettingsPage() {
                     setError(err?.message ?? "Failed to crop image");
                   }
                 }}
-                className="px-4 py-2 rounded-md border border-emerald-500/60 text-emerald-300 hover:text-white hover:border-emerald-400 transition"
+                className="px-4 py-2 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:text-white hover:border-[color:var(--accent)] transition"
               >
                 Save photo
               </button>

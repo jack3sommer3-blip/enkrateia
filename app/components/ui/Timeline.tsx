@@ -19,7 +19,7 @@ export default function Timeline({
               <div className="text-sm text-white">{item.score.toFixed(1)}</div>
               <div className="h-1 w-24 bg-white/5">
                 <div
-                  className="h-1 bg-emerald-500/70"
+                  className="h-1 bg-[color:var(--accent-60)]"
                   style={{ width: `${Math.min(100, item.score)}%` }}
                 />
               </div>

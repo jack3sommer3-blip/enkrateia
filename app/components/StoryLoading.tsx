@@ -29,7 +29,7 @@ export default function StoryLoading({ name }: { name?: string }) {
           {MESSAGES[index]}
         </p>
         <div className="mt-10 h-1 w-full bg-gray-900 rounded-full overflow-hidden">
-          <div className="h-full w-1/3 bg-emerald-500 animate-[load_2.2s_ease-in-out_infinite]" />
+          <div className="h-full w-1/3 bg-[color:var(--accent)] animate-[load_2.2s_ease-in-out_infinite]" />
         </div>
       </div>
     </main>

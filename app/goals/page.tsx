@@ -175,7 +175,7 @@ export default function GoalsPage() {
                           type="checkbox"
                           checked={enabled}
                           onChange={() => toggleVariable(category, option.key)}
-                          className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-emerald-500 checked:border-emerald-400 transition"
+                          className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-[color:var(--accent)] checked:border-[color:var(--accent-60)] transition"
                         />
                         <div>
                           <div className="text-white">{option.label}</div>
@@ -207,7 +207,7 @@ export default function GoalsPage() {
           <button
             onClick={saveGoals}
             disabled={saving}
-            className="px-4 py-2 rounded-md border border-emerald-500/60 text-emerald-300 hover:text-white hover:border-emerald-400 transition disabled:opacity-50"
+            className="px-4 py-2 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:text-white hover:border-[color:var(--accent)] transition disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save goals"}
           </button>

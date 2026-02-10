@@ -22,7 +22,7 @@ export default function Tabs({
           <span
             className={[
               "absolute left-0 right-0 -bottom-0.5 h-0.5 transition-all",
-              active === tab ? "bg-emerald-500" : "bg-transparent",
+              active === tab ? "accent-underline" : "bg-transparent",
             ].join(" ")}
           />
         </button>

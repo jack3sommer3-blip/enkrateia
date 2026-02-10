@@ -29,7 +29,7 @@ export default function Nav({ className }: { className?: string }) {
             className={[
               "px-4 py-2 rounded-full border transition text-sm font-medium",
               active
-                ? "bg-emerald-900/60 border-emerald-700 text-white"
+                ? "bg-[color:var(--accent-10)] border-[color:var(--accent-40)] text-white"
                 : "bg-gray-900/70 border-gray-800 text-gray-300 hover:text-white hover:border-gray-600",
             ].join(" ")}
           >

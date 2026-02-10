@@ -97,7 +97,7 @@ export default function OnboardingPage() {
         <button
           onClick={saveProfile}
           disabled={saving}
-          className="mt-6 w-full px-4 py-3 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition disabled:opacity-50"
+          className="mt-6 w-full px-4 py-3 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:border-[color:var(--accent)] transition disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save profile"}
         </button>

@@ -94,13 +94,13 @@ export default function LoginPage() {
 
         {error ? <div className="text-red-400 text-sm mt-3">{error}</div> : null}
         {message ? (
-          <div className="text-emerald-400 text-sm mt-3">{message}</div>
+          <div className="text-[color:var(--accent)] text-sm mt-3">{message}</div>
         ) : null}
 
         <button
           onClick={handleEmailAuth}
           disabled={loading}
-          className="mt-5 w-full px-4 py-3 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition disabled:opacity-50"
+          className="mt-5 w-full px-4 py-3 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:border-[color:var(--accent)] transition disabled:opacity-50"
         >
           {loading
             ? "Working…"

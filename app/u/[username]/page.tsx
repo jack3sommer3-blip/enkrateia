@@ -152,7 +152,7 @@ export default function PublicProfilePage() {
                     if (res) setIsFollowing(true);
                   }
                 }}
-                className="px-4 py-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 transition"
+                className="px-4 py-2 rounded-md border border-[color:var(--accent-40)] bg-[color:var(--accent-10)] text-[color:var(--accent)] hover:border-[color:var(--accent-60)] transition"
               >
                 {isFollowing ? "Unfollow" : "Follow"}
               </button>

@@ -106,27 +106,6 @@ export default function DashboardPage() {
     };
   }, [logMap]);
 
-  const masteryStreak = useMemo(() => {
-    const today = startOfDay(new Date());
-    let streak = 0;
-    for (let i = 0; i < 365; i += 1) {
-      const key = toDateKey(addDays(today, -i));
-      const row = logMap.get(key);
-      if (
-        row &&
-        row.workout_score >= 25 &&
-        row.sleep_score >= 25 &&
-        row.diet_score >= 25 &&
-        row.reading_score >= 25
-      ) {
-        streak += 1;
-      } else {
-        break;
-      }
-    }
-    return streak;
-  }, [logMap]);
-
   const consistencyStreak = useMemo(() => {
     const today = startOfDay(new Date());
     let streak = 0;
@@ -220,30 +199,18 @@ export default function DashboardPage() {
           <h1 className="mt-3 text-4xl md:text-6xl font-bold leading-tight">
             Hello, {profile.first_name}.
           </h1>
-          <p className="mt-2 text-sm text-gray-400">
-            Enkrateia system status and recent performance metrics.
-          </p>
+          <p className="mt-2 text-sm text-gray-400">Recent performance metrics:</p>
         </header>
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <MetricCard label="7-Day Avg" value={formatScore(avg7)} delta="+4.2" positive />
           <MetricCard label="30-Day Avg" value={formatScore(avg30)} delta="+1.1" positive />
-          <MetricCard label="Most Improved" value={mostImproved} />
-        </section>
-
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-          <CommandCard title="Mastery Streak">
-            <div className="text-3xl font-semibold text-white">{masteryStreak} days</div>
-            <div className="mt-2 text-sm text-gray-500">4/4 full points</div>
-          </CommandCard>
-          <CommandCard title="Consistency">
-            <div className="text-3xl font-semibold text-white">{consistencyStreak} days</div>
-            <div className="mt-2 text-sm text-gray-500">Any logging</div>
-          </CommandCard>
-          <CommandCard title="Most Improved">
-            <div className="text-3xl font-semibold text-white">{mostImproved}</div>
-            <div className="mt-2 text-sm text-gray-500">Last 14 days</div>
-          </CommandCard>
+          <MetricCard label="Most Improved" value={mostImproved} subtext="Last 14 days" />
+          <MetricCard
+            label="Consistency"
+            value={`${consistencyStreak} days`}
+            subtext="Consecutive logs"
+          />
         </section>
 
         <section className="mt-10">
@@ -262,7 +229,7 @@ export default function DashboardPage() {
             </div>
             <a
               href={`/day/${todayKey()}`}
-              className="mt-4 inline-flex items-center px-4 py-2 rounded-md border border-emerald-500/40 text-emerald-300 hover:text-white hover:border-emerald-400 transition"
+              className="mt-4 inline-flex items-center px-4 py-2 rounded-md border border-[color:var(--accent-40)] text-[color:var(--accent)] hover:text-white hover:border-[color:var(--accent-60)] transition"
             >
               Open Daily Log
             </a>

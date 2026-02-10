@@ -56,10 +56,12 @@ export default function DailyLog({
   dateKey,
   userId,
   title,
+  embedded = false,
 }: {
   dateKey: string;
   userId: string;
   title?: string;
+  embedded?: boolean;
 }) {
   const [data, setData] = useState<DayData>(DEFAULT_DATA);
   const [hydrated, setHydrated] = useState(false);
@@ -334,7 +336,7 @@ export default function DailyLog({
     <div
       className={[
         "p-6 rounded-md border transition command-surface",
-        earned ? "border-emerald-500/40 bg-emerald-500/5" : "",
+        earned ? "border-[color:var(--accent-40)] bg-[color:var(--accent-10)]" : "",
       ].join(" ")}
     >
       <div className="flex items-start justify-between gap-4">
@@ -346,7 +348,9 @@ export default function DailyLog({
         <div
           className={[
             "shrink-0 w-10 h-10 rounded-md border flex items-center justify-center",
-            earned ? "border-emerald-500/60 bg-emerald-500/10" : "border-white/10 bg-black/40",
+            earned
+              ? "border-[color:var(--accent-60)] bg-[color:var(--accent-10)]"
+              : "border-white/10 bg-black/40",
           ].join(" ")}
           aria-label={earned ? "Earned" : "Not earned"}
           title={earned ? "Earned" : "Not earned"}
@@ -401,9 +405,8 @@ export default function DailyLog({
     />
   );
 
-  return (
-    <main className="min-h-screen text-white flex flex-col items-center p-8">
-      <div className="w-full max-w-4xl">
+  const content = (
+    <div className="w-full max-w-4xl">
         <header className="mb-10">
           <div className="flex flex-col gap-3">
             <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
@@ -595,7 +598,7 @@ export default function DailyLog({
                           exerciseIntensityRef.current.value = "";
                         setExerciseOpen(false);
                       }}
-                      className="px-4 py-2 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition"
+                      className="px-4 py-2 rounded-md border border-[color:var(--accent-40)] text-[color:var(--accent)] hover:border-[color:var(--accent-60)] transition"
                     >
                       Save workout
                     </button>
@@ -913,7 +916,7 @@ export default function DailyLog({
                             }
                           }
                         }}
-                        className="px-4 py-2 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition"
+                        className="px-4 py-2 rounded-md border border-[color:var(--accent-40)] text-[color:var(--accent)] hover:border-[color:var(--accent-60)] transition"
                       >
                         {drinkingEditId ? "Save changes" : "Save drinking event"}
                       </button>
@@ -1109,7 +1112,7 @@ export default function DailyLog({
 
                         setReadingOpen(false);
                       }}
-                      className="px-4 py-2 rounded-md border border-emerald-500/50 text-emerald-200 hover:border-emerald-400 transition"
+                      className="px-4 py-2 rounded-md border border-[color:var(--accent-40)] text-[color:var(--accent)] hover:border-[color:var(--accent-60)] transition"
                     >
                       Save reading event
                     </button>
@@ -1177,6 +1180,14 @@ export default function DailyLog({
           </Card>
         </div>
       </div>
-    </main>
+    </div>
+  );
+
+  if (embedded) {
+    return <section className="text-white">{content}</section>;
+  }
+
+  return (
+    <main className="min-h-screen text-white flex flex-col items-center p-8">{content}</main>
   );
 }
