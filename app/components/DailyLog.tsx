@@ -18,6 +18,7 @@ import {
   listDrinkingEvents,
   updateDrinkingEvent,
 } from "@/lib/drinking";
+import { deleteFeedItemByEvent, upsertFeedItem, updateFeedItemByEvent } from "@/lib/social";
 import {
   clampInt,
   formatScore,
@@ -34,6 +35,9 @@ const DEFAULT_DATA: DayData = {
 };
 
 function id() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
   return Math.random().toString(36).slice(2, 10);
 }
 
@@ -543,11 +547,12 @@ export default function DailyLog({
                   </div>
                   <div className="mt-6 flex items-center gap-3">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const minutes = exerciseMinutesRef.current?.value ?? "";
                         const seconds = exerciseSecondsRef.current?.value ?? "";
                         const calories = exerciseCaloriesRef.current?.value ?? "";
                         const intensity = exerciseIntensityRef.current?.value ?? "";
+                        const workoutId = id();
                         setData((prev) => ({
                           ...prev,
                           workouts: {
@@ -555,7 +560,7 @@ export default function DailyLog({
                             activities: [
                               ...prev.workouts.activities,
                               {
-                                id: id(),
+                                id: workoutId,
                                 type: exerciseType,
                                 minutesText: minutes,
                                 secondsText: seconds,
@@ -565,6 +570,25 @@ export default function DailyLog({
                             ],
                           },
                         }));
+                        const summaryParts = [
+                          exerciseType,
+                          minutes ? `${minutes} min` : undefined,
+                          intensity ? `Intensity ${intensity}` : undefined,
+                        ].filter(Boolean);
+                        await upsertFeedItem({
+                          user_id: userId,
+                          event_date: dateKey,
+                          event_type: "workout",
+                          event_id: workoutId,
+                          summary: summaryParts.join(" • "),
+                          metadata: {
+                            type: exerciseType,
+                            minutes,
+                            seconds,
+                            calories,
+                            intensity,
+                          },
+                        });
                         if (exerciseMinutesRef.current) exerciseMinutesRef.current.value = "";
                         if (exerciseSecondsRef.current) exerciseSecondsRef.current.value = "";
                         if (exerciseCaloriesRef.current) exerciseCaloriesRef.current.value = "";
@@ -609,7 +633,10 @@ export default function DailyLog({
                       </div>
                     </div>
                     <button
-                      onClick={() => removeActivity(a.id)}
+                      onClick={async () => {
+                        removeActivity(a.id);
+                        await deleteFeedItemByEvent("workout", a.id);
+                      }}
                       className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition text-sm"
                     >
                       Remove
@@ -847,6 +874,14 @@ export default function DailyLog({
                                   event.id === updated.id ? updated : event
                                 )
                               );
+                              await updateFeedItemByEvent("drinking", updated.id, {
+                                summary: `Tier ${updated.tier} • ${updated.drinks} drinks`,
+                                metadata: {
+                                  tier: updated.tier,
+                                  drinks: updated.drinks,
+                                  note: updated.note,
+                                },
+                              });
                               setDrinkingEditId(null);
                               setDrinkingOpen(false);
                             }
@@ -860,6 +895,18 @@ export default function DailyLog({
                             });
                             if (created) {
                               setDrinkingEvents((prev) => [...prev, created]);
+                              await upsertFeedItem({
+                                user_id: userId,
+                                event_date: dateKey,
+                                event_type: "drinking",
+                                event_id: created.id,
+                                summary: `Tier ${created.tier} • ${created.drinks} drinks`,
+                                metadata: {
+                                  tier: created.tier,
+                                  drinks: created.drinks,
+                                  note: created.note,
+                                },
+                              });
                               if (drinkingDrinksRef.current)
                                 drinkingDrinksRef.current.value = "0";
                               if (drinkingNoteRef.current) drinkingNoteRef.current.value = "";
@@ -916,6 +963,7 @@ export default function DailyLog({
                               setDrinkingEvents((prev) =>
                                 prev.filter((item) => item.id !== event.id)
                               );
+                              await deleteFeedItemByEvent("drinking", event.id);
                             }
                           }}
                           className="text-gray-400 hover:text-white"
@@ -1006,7 +1054,7 @@ export default function DailyLog({
 
                   <div className="mt-6 flex items-center gap-3">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const title = readingTitleRef.current?.value ?? "";
                         const pages = Number(readingPagesRef.current?.value ?? 0) || 0;
                         const fiction = Number(readingFictionRef.current?.value ?? 0) || 0;
@@ -1015,8 +1063,9 @@ export default function DailyLog({
                         const quote = readingQuoteRef.current?.value ?? "";
                         const note = readingNoteRef.current?.value ?? "";
 
+                        const newEventId = id();
                         const newEvent: ReadingEvent = {
-                          id: id(),
+                          id: newEventId,
                           title: title.trim() || undefined,
                           pages: pages || undefined,
                           fictionPages: fiction || undefined,
@@ -1032,6 +1081,24 @@ export default function DailyLog({
                             events: [...(prev.reading.events ?? []), newEvent],
                           },
                         }));
+                        const totalPages =
+                          newEvent.pages ??
+                          (newEvent.fictionPages ?? 0) + (newEvent.nonfictionPages ?? 0);
+                        await upsertFeedItem({
+                          user_id: userId,
+                          event_date: dateKey,
+                          event_type: "reading",
+                          event_id: newEventId,
+                          summary: `Read ${totalPages || 0} pages${
+                            newEvent.title ? ` • ${newEvent.title}` : ""
+                          }`,
+                          metadata: {
+                            pages: newEvent.pages,
+                            fiction_pages: newEvent.fictionPages,
+                            nonfiction_pages: newEvent.nonfictionPages,
+                            title: newEvent.title,
+                          },
+                        });
 
                         if (readingTitleRef.current) readingTitleRef.current.value = "";
                         if (readingPagesRef.current) readingPagesRef.current.value = "";
@@ -1087,7 +1154,7 @@ export default function DailyLog({
                     ) : null}
                     <div className="mt-2">
                       <button
-                        onClick={() =>
+                        onClick={async () => {
                           setData((prev) => ({
                             ...prev,
                             reading: {
@@ -1096,8 +1163,9 @@ export default function DailyLog({
                                 (item) => item.id !== event.id
                               ),
                             },
-                          }))
-                        }
+                          }));
+                          await deleteFeedItemByEvent("reading", event.id);
+                        }}
                         className="text-gray-400 hover:text-white"
                       >
                         Delete

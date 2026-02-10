@@ -5,8 +5,22 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/app/components/Nav";
 import StoryLoading from "@/app/components/StoryLoading";
-import { getProfileByUsername } from "@/lib/profile";
-import type { Profile } from "@/lib/types";
+import { useSession } from "@/app/components/useSession";
+import { supabase } from "@/lib/supabase";
+import {
+  getUserFeed,
+  listFollowers,
+  listFollowing,
+  followUser,
+  unfollowUser,
+  listComments,
+  toggleLike,
+  addComment,
+  getLikesForFeed,
+  deleteComment,
+  getProfileByUsername,
+} from "@/lib/social";
+import type { Profile, FeedItem, Comment, Like } from "@/lib/types";
 
 function initials(profile: Profile) {
   const first = profile.first_name?.[0] ?? "";
@@ -17,8 +31,20 @@ function initials(profile: Profile) {
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
   const username = params?.username?.toLowerCase();
+  const { loading: sessionLoading, userId } = useSession();
   const [profile, setProfile] = useState<Profile | undefined>();
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"activity" | "badges" | "followers" | "following">(
+    "activity"
+  );
+  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [following, setFollowing] = useState<any[]>([]);
+  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [likes, setLikes] = useState<Record<string, Like[]>>({});
+  const [liked, setLiked] = useState<Record<string, boolean>>({});
+  const [commentBodies, setCommentBodies] = useState<Record<string, string>>({});
+  const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
     if (!username) return;
@@ -29,12 +55,54 @@ export default function PublicProfilePage() {
     });
   }, [username]);
 
-  if (loading) return <StoryLoading />;
+  useEffect(() => {
+    if (!profile?.id) return;
+    getUserFeed(profile.id).then((items) => {
+      setFeedItems(items);
+      getLikesForFeed(items.map((item) => item.id)).then((likesList) => {
+        const grouped: Record<string, Like[]> = {};
+        likesList.forEach((like) => {
+          grouped[like.feed_item_id] = [...(grouped[like.feed_item_id] ?? []), like];
+        });
+        setLikes(grouped);
+        if (userId) {
+          const likedMap: Record<string, boolean> = {};
+          likesList.forEach((like) => {
+            if (like.user_id === userId) likedMap[like.feed_item_id] = true;
+          });
+          setLiked(likedMap);
+        }
+      });
+    });
+    listFollowers(profile.id).then(setFollowers);
+    listFollowing(profile.id).then(setFollowing);
+    if (userId && userId !== profile.id) {
+      supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", userId)
+        .eq("following_id", profile.id)
+        .maybeSingle()
+        .then(({ data }: { data: any }) => {
+          setIsFollowing(!!data);
+        });
+    }
+  }, [profile?.id, userId]);
+
+  if (loading || sessionLoading) return <StoryLoading />;
 
   if (!profile) {
     return (
       <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
         <div className="text-gray-400">Profile not found.</div>
+      </main>
+    );
+  }
+
+  if (!profile.is_public && profile.id !== userId) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+        <div className="text-gray-400">This profile is private.</div>
       </main>
     );
   }
@@ -48,9 +116,9 @@ export default function PublicProfilePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-2xl font-semibold">
-                {profile.avatar_url ? (
+                {profile.profile_photo_url ? (
                   <img
-                    src={profile.avatar_url}
+                    src={profile.profile_photo_url}
                     alt={displayName}
                     className="w-full h-full object-cover rounded-full"
                   />
@@ -61,26 +129,32 @@ export default function PublicProfilePage() {
               <div>
                 <div className="text-3xl font-semibold">{displayName}</div>
                 <div className="text-gray-400">@{profile.username}</div>
-                {profile.location ? (
-                  <div className="text-gray-500 text-sm">{profile.location}</div>
-                ) : null}
-                {profile.website ? (
-                  <a
-                    href={profile.website}
-                    className="text-gray-400 text-sm hover:text-white"
-                  >
-                    {profile.website}
-                  </a>
-                ) : null}
               </div>
             </div>
 
-            <Link
-              href="/"
-              className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
-            >
-              Back to app
-            </Link>
+            {userId && userId !== profile.id ? (
+              <button
+                onClick={async () => {
+                  if (isFollowing) {
+                    const ok = await unfollowUser(userId, profile.id);
+                    if (ok) setIsFollowing(false);
+                  } else {
+                    const res = await followUser(userId, profile.id);
+                    if (res) setIsFollowing(true);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+              >
+                {isFollowing ? "Unfollow" : "Follow"}
+              </button>
+            ) : (
+              <Link
+                href="/"
+                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+              >
+                Back to app
+              </Link>
+            )}
           </div>
 
           <Nav />
@@ -96,28 +170,188 @@ export default function PublicProfilePage() {
           </section>
         )}
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-          {[
-            { label: "Enkrateia score", value: "Coming soon" },
-            { label: "Workouts this week", value: "Coming soon" },
-            { label: "Pages read this week", value: "Coming soon" },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="p-5 rounded-2xl border border-gray-800 bg-gray-900"
+        <section className="mt-8 flex flex-wrap gap-2">
+          {["activity", "badges", "followers", "following"].map((item) => (
+            <button
+              key={item}
+              onClick={() => setTab(item as typeof tab)}
+              className={[
+                "px-4 py-2 rounded-xl border transition",
+                tab === item
+                  ? "bg-emerald-950 border-emerald-700 text-white"
+                  : "bg-gray-900 border-gray-800 text-gray-300 hover:text-white",
+              ].join(" ")}
             >
-              <div className="text-gray-400 text-sm">{stat.label}</div>
-              <div className="text-xl font-semibold mt-2">{stat.value}</div>
-            </div>
+              {item[0].toUpperCase() + item.slice(1)}
+            </button>
           ))}
         </section>
 
-        <section className="mt-8">
-          <div className="text-xl font-semibold mb-3">Recent activity</div>
-          <div className="p-6 rounded-2xl border border-gray-800 bg-gray-900 text-gray-500">
-            Activity feed coming soon.
-          </div>
-        </section>
+        {tab === "activity" ? (
+          <section className="mt-6 space-y-4">
+            {feedItems.length === 0 ? (
+              <div className="text-gray-500">No activity yet.</div>
+            ) : (
+              feedItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-5 rounded-2xl border border-gray-800 bg-gray-900"
+                >
+                  <div className="text-gray-400 text-sm">{item.event_type}</div>
+                  <div className="text-white font-semibold mt-1">{item.summary}</div>
+                  <div className="text-gray-500 text-sm mt-1">
+                    {new Date(item.created_at).toLocaleString()}
+                  </div>
+                  <div className="mt-3 flex items-center gap-4 text-sm text-gray-400">
+                    <button
+                      onClick={async () => {
+                        if (!userId) return;
+                        const res = await toggleLike(item.id, !!liked[item.id], userId);
+                        if (res || res === false) {
+                          setLiked((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
+                          setLikes((prev) => {
+                            const current = prev[item.id] ?? [];
+                            if (liked[item.id]) {
+                              return {
+                                ...prev,
+                                [item.id]: current.filter((like) => like.user_id !== userId),
+                              };
+                            }
+                            return {
+                              ...prev,
+                              [item.id]: [
+                                ...current,
+                                { user_id: userId, feed_item_id: item.id },
+                              ],
+                            };
+                          });
+                        }
+                      }}
+                      className="hover:text-white"
+                    >
+                      {liked[item.id] ? "Unlike" : "Like"} •{" "}
+                      {likes[item.id]?.length ?? 0}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const existing = comments[item.id];
+                        if (existing) return;
+                        const list = await listComments(item.id);
+                        setComments((prev) => ({ ...prev, [item.id]: list }));
+                      }}
+                      className="hover:text-white"
+                    >
+                      Comments • {comments[item.id]?.length ?? 0}
+                    </button>
+                  </div>
+                  {comments[item.id] ? (
+                    <div className="mt-4 space-y-2">
+                      {comments[item.id].map((comment) => (
+                        <div
+                          key={comment.id}
+                          className="text-sm text-gray-300 flex items-center justify-between"
+                        >
+                          <span>{comment.body}</span>
+                          {comment.user_id === userId ? (
+                            <button
+                              onClick={async () => {
+                                const ok = await deleteComment(comment.id);
+                                if (ok) {
+                                  setComments((prev) => ({
+                                    ...prev,
+                                    [item.id]: prev[item.id].filter(
+                                      (c) => c.id !== comment.id
+                                    ),
+                                  }));
+                                }
+                              }}
+                              className="text-gray-500 hover:text-white text-xs"
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <input
+                          value={commentBodies[item.id] ?? ""}
+                          onChange={(e) =>
+                            setCommentBodies((prev) => ({
+                              ...prev,
+                              [item.id]: e.target.value,
+                            }))
+                          }
+                          className="flex-1 px-3 py-2 rounded-xl bg-black border border-gray-700"
+                          placeholder="Add a comment"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!userId) return;
+                            const body = commentBodies[item.id]?.trim();
+                            if (!body) return;
+                            const created = await addComment(item.id, body, userId);
+                            if (created) {
+                              setComments((prev) => ({
+                                ...prev,
+                                [item.id]: [...(prev[item.id] ?? []), created],
+                              }));
+                              setCommentBodies((prev) => ({ ...prev, [item.id]: "" }));
+                            }
+                          }}
+                          className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700"
+                        >
+                          Send
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </section>
+        ) : null}
+
+        {tab === "badges" ? (
+          <section className="mt-6 text-gray-500">Badges coming soon.</section>
+        ) : null}
+
+        {tab === "followers" ? (
+          <section className="mt-6 space-y-3">
+            {followers.length === 0 ? (
+              <div className="text-gray-500">No followers yet.</div>
+            ) : (
+              followers.map((row: any) => (
+                <Link
+                  key={row.follower_id}
+                  href={`/u/${row.profiles.username}`}
+                  className="flex items-center justify-between p-4 rounded-2xl border border-gray-800 bg-gray-900"
+                >
+                  <div className="text-white">{row.profiles.display_name}</div>
+                  <div className="text-gray-400">@{row.profiles.username}</div>
+                </Link>
+              ))
+            )}
+          </section>
+        ) : null}
+
+        {tab === "following" ? (
+          <section className="mt-6 space-y-3">
+            {following.length === 0 ? (
+              <div className="text-gray-500">Not following anyone yet.</div>
+            ) : (
+              following.map((row: any) => (
+                <Link
+                  key={row.following_id}
+                  href={`/u/${row.profiles.username}`}
+                  className="flex items-center justify-between p-4 rounded-2xl border border-gray-800 bg-gray-900"
+                >
+                  <div className="text-white">{row.profiles.display_name}</div>
+                  <div className="text-gray-400">@{row.profiles.username}</div>
+                </Link>
+              ))
+            )}
+          </section>
+        ) : null}
       </div>
     </main>
   );

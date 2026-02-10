@@ -61,9 +61,11 @@ export type Profile = {
   username: string;
   display_name: string | null;
   bio: string | null;
-  avatar_url: string | null;
-  location: string | null;
-  website: string | null;
+  profile_photo_url: string | null;
+  is_public: boolean;
+  show_workouts: boolean;
+  show_reading: boolean;
+  show_drinking: boolean;
   created_at: string | null;
   first_name: string;
   last_name: string;
@@ -99,4 +101,35 @@ export type ReadingEvent = {
   nonfictionPages?: number;
   quote?: string;
   note?: string;
+};
+
+export type Follow = {
+  follower_id: string;
+  following_id: string;
+  created_at?: string | null;
+};
+
+export type FeedItem = {
+  id: string;
+  user_id: string;
+  created_at: string;
+  event_date: string;
+  event_type: "workout" | "reading" | "drinking";
+  event_id: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+};
+
+export type Like = {
+  user_id: string;
+  feed_item_id: string;
+  created_at?: string | null;
+};
+
+export type Comment = {
+  id: string;
+  user_id: string;
+  feed_item_id: string;
+  body: string;
+  created_at: string;
 };

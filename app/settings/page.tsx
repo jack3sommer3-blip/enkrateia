@@ -22,9 +22,11 @@ export default function SettingsPage() {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [location, setLocation] = useState("");
-  const [website, setWebsite] = useState("");
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
+  const [showWorkouts, setShowWorkouts] = useState(true);
+  const [showReading, setShowReading] = useState(true);
+  const [showDrinking, setShowDrinking] = useState(true);
 
   useEffect(() => {
     if (loading) return;
@@ -45,9 +47,11 @@ export default function SettingsPage() {
         data.display_name ?? `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim()
       );
       setBio(data.bio ?? "");
-      setAvatarUrl(data.avatar_url ?? "");
-      setLocation(data.location ?? "");
-      setWebsite(data.website ?? "");
+      setProfilePhotoUrl(data.profile_photo_url ?? "");
+      setIsPublic(data.is_public ?? true);
+      setShowWorkouts(data.show_workouts ?? true);
+      setShowReading(data.show_reading ?? true);
+      setShowDrinking(data.show_drinking ?? true);
     });
   }, [loading, router, userId]);
 
@@ -64,9 +68,11 @@ export default function SettingsPage() {
         username: username.trim(),
         display_name: displayName.trim() || null,
         bio: bio.trim() || null,
-        avatar_url: avatarUrl.trim() || null,
-        location: location.trim() || null,
-        website: website.trim() || null,
+        profile_photo_url: profilePhotoUrl.trim() || null,
+        is_public: isPublic,
+        show_workouts: showWorkouts,
+        show_reading: showReading,
+        show_drinking: showDrinking,
       })
       .eq("id", userId);
     setSaving(false);
@@ -147,34 +153,80 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div>
-              <div className="text-gray-400 text-sm mb-1">Avatar URL</div>
+            <div className="md:col-span-2">
+              <div className="text-gray-400 text-sm mb-1">Profile photo</div>
+              {profilePhotoUrl ? (
+                <img
+                  src={profilePhotoUrl}
+                  alt="Profile"
+                  className="w-20 h-20 rounded-full object-cover border border-gray-700 mb-3"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gray-800 border border-gray-700 mb-3" />
+              )}
               <input
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div>
-              <div className="text-gray-400 text-sm mb-1">Location</div>
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
-                placeholder="City, Country"
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !userId) return;
+                  const filePath = `${userId}/${crypto.randomUUID()}`;
+                  const { error: uploadError } = await supabase.storage
+                    .from("profile-photos")
+                    .upload(filePath, file, { upsert: true });
+                  if (uploadError) {
+                    setError(uploadError.message);
+                    return;
+                  }
+                  const { data } = supabase.storage
+                    .from("profile-photos")
+                    .getPublicUrl(filePath);
+                  setProfilePhotoUrl(data.publicUrl);
+                }}
+                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"
               />
             </div>
 
             <div className="md:col-span-2">
-              <div className="text-gray-400 text-sm mb-1">Website</div>
-              <input
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
-                placeholder="https://..."
-              />
+              <div className="text-gray-400 text-sm mb-2">Privacy</div>
+              <label className="flex items-center gap-3 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="w-5 h-5 accent-emerald-500"
+                />
+                Public profile
+              </label>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={showWorkouts}
+                    onChange={(e) => setShowWorkouts(e.target.checked)}
+                    className="w-5 h-5 accent-emerald-500"
+                  />
+                  Show workouts
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={showReading}
+                    onChange={(e) => setShowReading(e.target.checked)}
+                    className="w-5 h-5 accent-emerald-500"
+                  />
+                  Show reading
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={showDrinking}
+                    onChange={(e) => setShowDrinking(e.target.checked)}
+                    className="w-5 h-5 accent-emerald-500"
+                  />
+                  Show drinking
+                </label>
+              </div>
             </div>
           </div>
 
