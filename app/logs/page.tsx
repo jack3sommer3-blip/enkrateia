@@ -130,17 +130,6 @@ export default function LogsPage() {
     return { label: "DEFICIT", color: "text-rose-400/80" };
   };
 
-  const chartFor = (score: number) => {
-    const points = [0, score * 0.4, score * 0.7, score];
-    return points
-      .map((value, index) => {
-        const x = (index / (points.length - 1)) * 100;
-        const y = 100 - Math.min(100, Math.max(0, (value / 25) * 100));
-        return `${x},${y}`;
-      })
-      .join(" ");
-  };
-
   return (
     <main className="min-h-screen text-white flex flex-col items-center p-8">
       <div className="w-full max-w-6xl pt-3 space-y-4">
@@ -181,101 +170,114 @@ export default function LogsPage() {
             </div>
 
             <div className="grid grid-cols-7 gap-2">
-            {calendarDays.map((date, index) => {
-              if (!date) {
+              {calendarDays.map((date, index) => {
+                if (!date) {
+                  return (
+                    <div
+                      key={`empty-${index}`}
+                      className="aspect-square rounded-md border border-white/5 bg-black/20"
+                    />
+                  );
+                }
+                const key = toDateKey(date);
+                const row = logMap.get(key);
+                const isToday = key === toDateKey(new Date());
+                const isSelected = key === selectedDate;
                 return (
-                  <div
-                    key={`empty-${index}`}
-                    className="aspect-square rounded-md border border-white/5 bg-black/20"
-                  />
-                );
-              }
-              const key = toDateKey(date);
-              const row = logMap.get(key);
-              const isToday = key === toDateKey(new Date());
-              const isSelected = key === selectedDate;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDate(key);
-                    requestAnimationFrame(() => {
-                      logRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    });
-                  }}
-                  className={[
-                    "relative aspect-square rounded-md border transition text-left",
-                    "bg-[#0b1220]/70",
-                    "border-white/10",
-                    row ? "hover:border-[color:var(--accent-60)]" : "hover:border-white/20",
-                    isToday ? "border-[color:var(--accent-60)]" : "",
-                    isSelected ? "shadow-[0_0_16px_rgba(31,122,79,0.35)]" : "",
-                  ].join(" ")}
-                >
-                  <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:80px_80px] opacity-20" />
-                  <div className="relative h-full p-2 flex flex-col">
-                    <div className="text-xs text-gray-500">{date.getDate()}</div>
-                    <div className="flex-1 flex flex-col items-center justify-center">
-                      {row ? (
-                        <>
-                          <div className="text-2xl font-semibold text-white">
-                            {row.total_score.toFixed(0)}
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(key);
+                      requestAnimationFrame(() => {
+                        logRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      });
+                    }}
+                    className={[
+                      "relative aspect-square rounded-md border transition text-left",
+                      "bg-[#0b1220]/70",
+                      "border-white/10",
+                      row ? "hover:border-[color:var(--accent-60)]" : "hover:border-white/20",
+                      isToday ? "border-[color:var(--accent-60)]" : "",
+                      isSelected ? "shadow-[0_0_16px_rgba(31,122,79,0.35)]" : "",
+                    ].join(" ")}
+                  >
+                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:80px_80px] opacity-20" />
+                    <div className="relative h-full p-2 grid grid-rows-[auto_1fr]">
+                      <div className="text-xs text-gray-500">{date.getDate()}</div>
+                      <div className="flex flex-col items-center justify-center">
+                        {row ? (
+                          <>
+                            <div className="text-2xl font-semibold text-white">
+                              {row.total_score.toFixed(0)}
+                            </div>
+                            <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 opacity-70">
+                              /100
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-[10px] uppercase tracking-[0.3em] text-gray-700">
+                            No log
                           </div>
-                          <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500">
-                            /100
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-[10px] uppercase tracking-[0.3em] text-gray-700">
-                          No log
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
             </div>
 
             {logsLoading ? <div className="text-gray-500 mt-3">Loading month…</div> : null}
           </div>
 
-          <div className="rounded-md border border-white/10 bg-[#0b1220]/80 p-4">
-            <div className="text-[11px] uppercase tracking-[0.35em] text-gray-500">
-              Daily Progress
-            </div>
-            {selectedRow ? (
-              <div className="mt-4 space-y-4 text-sm">
-                {[
-                  { label: "Exercise", score: selectedRow.workout_score },
-                  { label: "Sleep", score: selectedRow.sleep_score },
-                  { label: "Diet", score: selectedRow.diet_score },
-                  { label: "Reading", score: selectedRow.reading_score },
-                ].map((category) => (
-                  <div key={category.label}>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">{category.label}</span>
-                      <span className={statusLabel(category.score).color}>
-                        {statusLabel(category.score).label}
-                      </span>
-                    </div>
-                    <div className="mt-2">
-                      <svg viewBox="0 0 100 100" className="w-full h-10">
-                        <polyline
-                          fill="none"
-                          stroke="rgba(31,122,79,0.8)"
-                          strokeWidth="2"
-                          points={chartFor(category.score)}
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                ))}
+          <div className="relative rounded-md border border-white/10 bg-[#0b1220]/80 p-4 overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(transparent_0%,rgba(255,255,255,0.12)_50%,transparent_100%)]" />
+            <div className="absolute inset-0 pointer-events-none opacity-15 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100%_6px]" />
+            <div className="relative">
+              <div className="text-[11px] uppercase tracking-[0.35em] text-gray-500">
+                Daily Progress
               </div>
-            ) : (
-              <div className="mt-4 text-sm text-gray-500">No activity logged for this date.</div>
-            )}
+              <div className="mt-2 h-px bg-white/10" />
+              {selectedRow ? (
+                <div className="mt-3 space-y-3 text-sm">
+                  {[
+                    { label: "Exercise", score: selectedRow.workout_score },
+                    { label: "Sleep", score: selectedRow.sleep_score },
+                    { label: "Diet", score: selectedRow.diet_score },
+                    { label: "Reading", score: selectedRow.reading_score },
+                  ].map((category) => {
+                    const status = statusLabel(category.score);
+                    const percent = Math.min(100, Math.max(0, (category.score / 25) * 100));
+                    return (
+                      <div
+                        key={category.label}
+                        className="relative rounded-md border border-white/10 px-3 py-2 hover:border-[color:var(--accent-60)] transition"
+                      >
+                        <div className="absolute inset-x-0 bottom-0 h-1 bg-white/5">
+                          <div
+                            className="h-full bg-[color:var(--accent-60)]"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-300">{category.label}</span>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-white">
+                              {category.score.toFixed(0)} / 25
+                            </div>
+                            <div className={`${status.color} text-[11px] uppercase tracking-[0.25em]`}>
+                              {status.label}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-4 text-sm text-gray-500">No activity logged for this date.</div>
+              )}
+            </div>
           </div>
         </section>
 
