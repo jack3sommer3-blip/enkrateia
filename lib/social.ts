@@ -398,7 +398,10 @@ export async function listComments(feedItemId: string) {
     .eq("feed_item_id", feedItemId)
     .order("created_at", { ascending: true });
   if (error) return [];
-  return data ?? [];
+  return (data ?? []).map((row: any) => ({
+    ...row,
+    profiles: Array.isArray(row.profiles) ? row.profiles[0] : row.profiles,
+  })) as Comment[];
 }
 
 export async function getLikesForFeed(feedItemIds: string[]) {
