@@ -1,4 +1,4 @@
-import { DayData, DayScore, Goals, DrinkingEvent } from "@/lib/types";
+import { DayData, DayScore, Goals, DrinkingEvent, ReadingEvent } from "@/lib/types";
 import { computeCategoryScore, getDefaultGoals, normalizeGoals } from "@/lib/goals";
 import { clampInt, intFromText, numFromText } from "@/lib/utils";
 
@@ -27,10 +27,27 @@ export function computeScores(
   const cookedMeals = intFromText(data.diet.cookedMealsText) ?? 0;
   const restaurantMeals = intFromText(data.diet.restaurantMealsText) ?? 0;
   const totalMeals = cookedMeals + restaurantMeals;
+  const readingEvents = (data.reading.events ?? []) as ReadingEvent[];
   const pagesReadRaw = intFromText(data.reading.pagesText) ?? 0;
-  const fictionPages = intFromText(data.reading.fictionPagesText) ?? 0;
-  const nonfictionPages = intFromText(data.reading.nonfictionPagesText) ?? 0;
-  const pagesRead = pagesReadRaw || fictionPages + nonfictionPages;
+  const fictionPagesRaw = intFromText(data.reading.fictionPagesText) ?? 0;
+  const nonfictionPagesRaw = intFromText(data.reading.nonfictionPagesText) ?? 0;
+
+  const eventPages = readingEvents.reduce(
+    (sum, event) => sum + (event.pages ?? 0),
+    0
+  );
+  const eventFictionPages = readingEvents.reduce(
+    (sum, event) => sum + (event.fictionPages ?? 0),
+    0
+  );
+  const eventNonfictionPages = readingEvents.reduce(
+    (sum, event) => sum + (event.nonfictionPages ?? 0),
+    0
+  );
+
+  const fictionPages = fictionPagesRaw || eventFictionPages;
+  const nonfictionPages = nonfictionPagesRaw || eventNonfictionPages;
+  const pagesRead = pagesReadRaw || eventPages || fictionPages + nonfictionPages;
   const healthiness = numFromText(data.diet.healthinessText) ?? 0;
   const protein = numFromText(data.diet.proteinText) ?? 0;
 

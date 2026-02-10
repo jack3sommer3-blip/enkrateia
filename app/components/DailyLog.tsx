@@ -3,10 +3,21 @@
 import { useEffect, useMemo, useRef, useState, forwardRef } from "react";
 import Nav from "@/app/components/Nav";
 import { supabase } from "@/lib/supabase";
-import { DayData, ActivityType, WorkoutActivity, DrinkingEvent } from "@/lib/types";
+import {
+  DayData,
+  ActivityType,
+  WorkoutActivity,
+  DrinkingEvent,
+  ReadingEvent,
+} from "@/lib/types";
 import { computeScores } from "@/lib/scoring";
 import { getDefaultGoals, normalizeGoals } from "@/lib/goals";
-import { createDrinkingEvent, deleteDrinkingEvent, listDrinkingEvents } from "@/lib/drinking";
+import {
+  createDrinkingEvent,
+  deleteDrinkingEvent,
+  listDrinkingEvents,
+  updateDrinkingEvent,
+} from "@/lib/drinking";
 import {
   clampInt,
   formatScore,
@@ -57,6 +68,20 @@ export default function DailyLog({
   const [drinkingTier, setDrinkingTier] = useState<1 | 2 | 3>(2);
   const drinkingDrinksRef = useRef<HTMLInputElement | null>(null);
   const drinkingNoteRef = useRef<HTMLInputElement | null>(null);
+  const [drinkingEditId, setDrinkingEditId] = useState<string | null>(null);
+  const [exerciseOpen, setExerciseOpen] = useState(false);
+  const [exerciseType, setExerciseType] = useState<ActivityType>("Weight Lifting");
+  const exerciseMinutesRef = useRef<HTMLInputElement | null>(null);
+  const exerciseSecondsRef = useRef<HTMLInputElement | null>(null);
+  const exerciseCaloriesRef = useRef<HTMLInputElement | null>(null);
+  const exerciseIntensityRef = useRef<HTMLInputElement | null>(null);
+  const [readingOpen, setReadingOpen] = useState(false);
+  const readingTitleRef = useRef<HTMLInputElement | null>(null);
+  const readingPagesRef = useRef<HTMLInputElement | null>(null);
+  const readingFictionRef = useRef<HTMLInputElement | null>(null);
+  const readingNonfictionRef = useRef<HTMLInputElement | null>(null);
+  const readingQuoteRef = useRef<HTMLInputElement | null>(null);
+  const readingNoteRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -79,6 +104,20 @@ export default function DailyLog({
             parsed?.sleep?.hoursText
         );
         const sleepParts = splitHoursToParts(legacySleep);
+        const legacyReadingEvent =
+          parsed?.reading?.events && parsed.reading.events.length > 0
+            ? undefined
+            : parsed?.reading?.title || parsed?.reading?.pagesText
+              ? {
+                  id: id(),
+                  title: parsed?.reading?.title,
+                  pages: intFromText(parsed?.reading?.pagesText),
+                  fictionPages: intFromText(parsed?.reading?.fictionPagesText),
+                  nonfictionPages: intFromText(parsed?.reading?.nonfictionPagesText),
+                  quote: parsed?.reading?.quote,
+                  note: parsed?.reading?.note,
+                }
+              : undefined;
         setData({
           ...DEFAULT_DATA,
           ...parsed,
@@ -109,6 +148,10 @@ export default function DailyLog({
             hoursText: parsed?.sleep?.hoursText ?? sleepParts.hoursText,
             minutesText: parsed?.sleep?.minutesText ?? sleepParts.minutesText,
             restingHrText: parsed?.sleep?.restingHrText,
+          },
+          reading: {
+            ...parsed?.reading,
+            events: parsed?.reading?.events ?? (legacyReadingEvent ? [legacyReadingEvent] : []),
           },
         });
       } else {
@@ -154,6 +197,47 @@ export default function DailyLog({
       mounted = false;
     };
   }, [userId, dateKey]);
+
+  useEffect(() => {
+    if (!drinkingOpen) return;
+    const event = drinkingEvents.find((item) => item.id === drinkingEditId);
+    if (event) {
+      requestAnimationFrame(() => {
+        if (drinkingDrinksRef.current)
+          drinkingDrinksRef.current.value = String(event.drinks);
+        if (drinkingNoteRef.current) drinkingNoteRef.current.value = event.note ?? "";
+        setDrinkingTier(event.tier);
+      });
+    } else {
+      requestAnimationFrame(() => {
+        if (drinkingDrinksRef.current) drinkingDrinksRef.current.value = "0";
+        if (drinkingNoteRef.current) drinkingNoteRef.current.value = "";
+      });
+    }
+  }, [drinkingOpen, drinkingEditId, drinkingEvents]);
+
+  useEffect(() => {
+    if (!exerciseOpen) return;
+    requestAnimationFrame(() => {
+      setExerciseType("Weight Lifting");
+      if (exerciseMinutesRef.current) exerciseMinutesRef.current.value = "";
+      if (exerciseSecondsRef.current) exerciseSecondsRef.current.value = "";
+      if (exerciseCaloriesRef.current) exerciseCaloriesRef.current.value = "";
+      if (exerciseIntensityRef.current) exerciseIntensityRef.current.value = "";
+    });
+  }, [exerciseOpen]);
+
+  useEffect(() => {
+    if (!readingOpen) return;
+    requestAnimationFrame(() => {
+      if (readingTitleRef.current) readingTitleRef.current.value = "";
+      if (readingPagesRef.current) readingPagesRef.current.value = "";
+      if (readingFictionRef.current) readingFictionRef.current.value = "";
+      if (readingNonfictionRef.current) readingNonfictionRef.current.value = "";
+      if (readingQuoteRef.current) readingQuoteRef.current.value = "";
+      if (readingNoteRef.current) readingNoteRef.current.value = "";
+    });
+  }, [readingOpen]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -202,7 +286,16 @@ export default function DailyLog({
   const cookedMeals = intFromText(data.diet.cookedMealsText) ?? 0;
   const restaurantMeals = intFromText(data.diet.restaurantMealsText) ?? 0;
   const totalMeals = cookedMeals + restaurantMeals;
-  const pagesRead = intFromText(data.reading.pagesText) ?? 0;
+  const readingEvents = (data.reading.events ?? []) as ReadingEvent[];
+  const pagesRead = readingEvents.reduce((sum, event) => sum + (event.pages ?? 0), 0);
+  const fictionPages = readingEvents.reduce(
+    (sum, event) => sum + (event.fictionPages ?? 0),
+    0
+  );
+  const nonfictionPages = readingEvents.reduce(
+    (sum, event) => sum + (event.nonfictionPages ?? 0),
+    0
+  );
   const scores = computeScores(data, goals, drinkingEvents);
   const formKey = `${dateKey}-${hydrated ? "ready" : "loading"}`;
 
@@ -211,34 +304,6 @@ export default function DailyLog({
     (scores.sleepScore >= 25 ? 1 : 0) +
     (scores.dietScore >= 25 ? 1 : 0) +
     (scores.readingScore >= 25 ? 1 : 0);
-
-  const addActivity = () => {
-    setData((prev) => ({
-      ...prev,
-      workouts: {
-        ...prev.workouts,
-        activities: [
-          ...prev.workouts.activities,
-          { id: id(), type: "Weight Lifting" },
-        ],
-      },
-    }));
-  };
-
-  const updateActivity = (
-    activityId: string,
-    patch: Partial<WorkoutActivity>
-  ) => {
-    setData((prev) => ({
-      ...prev,
-      workouts: {
-        ...prev.workouts,
-        activities: prev.workouts.activities.map((a) =>
-          a.id === activityId ? { ...a, ...patch } : a
-        ),
-      },
-    }));
-  };
 
   const removeActivity = (activityId: string) => {
     setData((prev) => ({
@@ -385,10 +450,10 @@ export default function DailyLog({
           >
             <div className="flex items-center gap-3">
               <button
-                onClick={addActivity}
+                onClick={() => setExerciseOpen(true)}
                 className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
               >
-                Add activity
+                Add workout
               </button>
             </div>
 
@@ -413,6 +478,115 @@ export default function DailyLog({
               </div>
             </div>
 
+            {exerciseOpen ? (
+              <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
+                <div className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xl font-semibold">Add workout</div>
+                    <button
+                      onClick={() => setExerciseOpen(false)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Activity</Label>
+                      <Select
+                        value={exerciseType}
+                        onChange={(e) =>
+                          setExerciseType(e.target.value as ActivityType)
+                        }
+                      >
+                        <option>Running</option>
+                        <option>Walking</option>
+                        <option>Treadmill Walking</option>
+                        <option>Weight Lifting</option>
+                        <option>Cycling</option>
+                        <option>HIIT</option>
+                        <option>Yoga</option>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Minutes</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="e.g., 45"
+                        ref={exerciseMinutesRef}
+                      />
+                    </div>
+                    <div>
+                      <Label>Seconds</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="e.g., 30"
+                        ref={exerciseSecondsRef}
+                      />
+                    </div>
+                    <div>
+                      <Label>Calories (optional)</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="e.g., 320"
+                        ref={exerciseCaloriesRef}
+                      />
+                    </div>
+                    <div>
+                      <Label>Intensity 1–9 (optional)</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="1–9"
+                        ref={exerciseIntensityRef}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-6 flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        const minutes = exerciseMinutesRef.current?.value ?? "";
+                        const seconds = exerciseSecondsRef.current?.value ?? "";
+                        const calories = exerciseCaloriesRef.current?.value ?? "";
+                        const intensity = exerciseIntensityRef.current?.value ?? "";
+                        setData((prev) => ({
+                          ...prev,
+                          workouts: {
+                            ...prev.workouts,
+                            activities: [
+                              ...prev.workouts.activities,
+                              {
+                                id: id(),
+                                type: exerciseType,
+                                minutesText: minutes,
+                                secondsText: seconds,
+                                caloriesText: calories,
+                                intensityText: intensity,
+                              },
+                            ],
+                          },
+                        }));
+                        if (exerciseMinutesRef.current) exerciseMinutesRef.current.value = "";
+                        if (exerciseSecondsRef.current) exerciseSecondsRef.current.value = "";
+                        if (exerciseCaloriesRef.current) exerciseCaloriesRef.current.value = "";
+                        if (exerciseIntensityRef.current)
+                          exerciseIntensityRef.current.value = "";
+                        setExerciseOpen(false);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                    >
+                      Save workout
+                    </button>
+                    <button
+                      onClick={() => setExerciseOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {data.workouts.activities.length === 0 ? (
               <div className="text-gray-500 mt-4 text-sm">
                 No activities yet. Add one to start logging.
@@ -420,87 +594,26 @@ export default function DailyLog({
             ) : (
               <div className="mt-4 space-y-4">
                 {data.workouts.activities.map((a) => (
-                  <div key={a.id} className="p-4 rounded-2xl bg-black border border-gray-800">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                      <div className="md:col-span-1">
-                        <Label>Activity</Label>
-                        <Select
-                          value={a.type}
-                          onChange={(e) =>
-                            updateActivity(a.id, { type: e.target.value as ActivityType })
-                          }
-                        >
-                          <option>Running</option>
-                          <option>Walking</option>
-                          <option>Treadmill Walking</option>
-                          <option>Weight Lifting</option>
-                          <option>Cycling</option>
-                          <option>HIIT</option>
-                          <option>Yoga</option>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label>Minutes</Label>
-                        <Input
-                          inputMode="numeric"
-                          placeholder="e.g., 45"
-                          defaultValue={a.minutesText ?? ""}
-                          onBlur={(e) => {
-                            const value = e.currentTarget.value;
-                            updateActivity(a.id, { minutesText: value });
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Seconds</Label>
-                        <Input
-                          inputMode="numeric"
-                          placeholder="e.g., 30"
-                          defaultValue={a.secondsText ?? ""}
-                          onBlur={(e) => {
-                            const value = e.currentTarget.value;
-                            updateActivity(a.id, { secondsText: value });
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Calories (optional)</Label>
-                        <Input
-                          inputMode="numeric"
-                          placeholder="e.g., 320"
-                          defaultValue={a.caloriesText ?? ""}
-                          onBlur={(e) => {
-                            const value = e.currentTarget.value;
-                            updateActivity(a.id, { caloriesText: value });
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Intensity 1–9 (optional)</Label>
-                        <Input
-                          inputMode="numeric"
-                          placeholder="1–9"
-                          defaultValue={a.intensityText ?? ""}
-                          onBlur={(e) => {
-                            const value = e.currentTarget.value;
-                            updateActivity(a.id, { intensityText: value });
-                          }}
-                        />
+                  <div
+                    key={a.id}
+                    className="p-4 rounded-2xl bg-black border border-gray-800 flex items-center justify-between"
+                  >
+                    <div className="text-gray-200">
+                      <div className="font-semibold">{a.type}</div>
+                      <div className="text-gray-400 text-sm">
+                        {a.minutesText || a.secondsText
+                          ? `${a.minutesText ?? "0"}m ${a.secondsText ?? "0"}s`
+                          : "No time logged"}
+                        {a.caloriesText ? ` • ${a.caloriesText} cal` : ""}
+                        {a.intensityText ? ` • Intensity ${a.intensityText}` : ""}
                       </div>
                     </div>
-
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        onClick={() => removeActivity(a.id)}
-                        className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition text-sm"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => removeActivity(a.id)}
+                      className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition text-sm"
+                    >
+                      Remove
+                    </button>
                   </div>
                 ))}
               </div>
@@ -662,9 +775,14 @@ export default function DailyLog({
                 <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
                   <div className="w-full max-w-2xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
                     <div className="flex items-center justify-between">
-                      <div className="text-xl font-semibold">Add drinking event</div>
+                      <div className="text-xl font-semibold">
+                        {drinkingEditId ? "Edit drinking event" : "Add drinking event"}
+                      </div>
                       <button
-                        onClick={() => setDrinkingOpen(false)}
+                        onClick={() => {
+                          setDrinkingOpen(false);
+                          setDrinkingEditId(null);
+                        }}
                         className="text-gray-400 hover:text-white"
                       >
                         Close
@@ -708,15 +826,31 @@ export default function DailyLog({
                         <Label>Note (optional)</Label>
                         <Input placeholder="e.g., wedding" ref={drinkingNoteRef} />
                       </div>
-                      <div className="md:col-span-3 flex items-center gap-3">
-                        <button
-                          onClick={async () => {
-                            const drinkValue = drinkingDrinksRef.current?.value ?? "0";
-                            const noteValue = drinkingNoteRef.current?.value ?? "";
-                            const drinks = Math.max(
-                              0,
-                              Math.min(20, Number(drinkValue) || 0)
-                            );
+                    <div className="md:col-span-3 flex items-center gap-3">
+                      <button
+                        onClick={async () => {
+                          const drinkValue = drinkingDrinksRef.current?.value ?? "0";
+                          const noteValue = drinkingNoteRef.current?.value ?? "";
+                          const drinks = Math.max(
+                            0,
+                            Math.min(20, Number(drinkValue) || 0)
+                          );
+                          if (drinkingEditId) {
+                            const updated = await updateDrinkingEvent(drinkingEditId, {
+                              tier: drinkingTier,
+                              drinks,
+                              note: noteValue.trim() || null,
+                            });
+                            if (updated) {
+                              setDrinkingEvents((prev) =>
+                                prev.map((event) =>
+                                  event.id === updated.id ? updated : event
+                                )
+                              );
+                              setDrinkingEditId(null);
+                              setDrinkingOpen(false);
+                            }
+                          } else {
                             const created = await createDrinkingEvent({
                               user_id: userId,
                               date: dateKey,
@@ -726,22 +860,27 @@ export default function DailyLog({
                             });
                             if (created) {
                               setDrinkingEvents((prev) => [...prev, created]);
-                              if (drinkingDrinksRef.current) drinkingDrinksRef.current.value = "0";
+                              if (drinkingDrinksRef.current)
+                                drinkingDrinksRef.current.value = "0";
                               if (drinkingNoteRef.current) drinkingNoteRef.current.value = "";
                               setDrinkingOpen(false);
                             }
-                          }}
-                          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
-                        >
-                          Save drinking event
-                        </button>
-                        <button
-                          onClick={() => setDrinkingOpen(false)}
-                          className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                          }
+                        }}
+                        className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                      >
+                        {drinkingEditId ? "Save changes" : "Save drinking event"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDrinkingOpen(false);
+                          setDrinkingEditId(null);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                     </div>
                   </div>
                 </div>
@@ -760,19 +899,30 @@ export default function DailyLog({
                         Tier {event.tier} • {event.drinks} drinks
                         {event.note ? ` • ${event.note}` : ""}
                       </div>
-                      <button
-                        onClick={async () => {
-                          const ok = await deleteDrinkingEvent(event.id);
-                          if (ok) {
-                            setDrinkingEvents((prev) =>
-                              prev.filter((item) => item.id !== event.id)
-                            );
-                          }
-                        }}
-                        className="text-gray-400 hover:text-white"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            setDrinkingEditId(event.id);
+                            setDrinkingOpen(true);
+                          }}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const ok = await deleteDrinkingEvent(event.id);
+                            if (ok) {
+                              setDrinkingEvents((prev) =>
+                                prev.filter((item) => item.id !== event.id)
+                              );
+                            }
+                          }}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -783,105 +933,179 @@ export default function DailyLog({
           <Card
             title="Reading"
             subtitle="Log what you read; earn up to 25 points based on your goals."
-            hint={`Pages today: ${pagesRead} / 20  •  Score: ${formatScore(
+            hint={`Pages today: ${pagesRead}  •  Score: ${formatScore(
               scores.readingScore
             )}/25`}
             earned={scores.readingScore >= 25}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <Label>Book title</Label>
-                <Input
-                  placeholder="e.g., Meditations"
-                  defaultValue={data.reading.title ?? ""}
-                  onBlur={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      reading: { ...prev.reading, title: value },
-                    }));
-                  }}
-                />
-              </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setReadingOpen(true)}
+                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+              >
+                Add reading event
+              </button>
+            </div>
 
-              <div>
-                <Label>Pages read</Label>
-                <Input
-                  inputMode="numeric"
-                  placeholder="e.g., 20"
-                  defaultValue={data.reading.pagesText ?? ""}
-                  onBlur={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      reading: { ...prev.reading, pagesText: value },
-                    }));
-                  }}
-                />
-              </div>
+            {readingOpen ? (
+              <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
+                <div className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xl font-semibold">Add reading event</div>
+                    <button
+                      onClick={() => setReadingOpen(false)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      Close
+                    </button>
+                  </div>
 
-              <div>
-                <Label>Fiction pages</Label>
-                <Input
-                  inputMode="numeric"
-                  placeholder="e.g., 10"
-                  defaultValue={data.reading.fictionPagesText ?? ""}
-                  onBlur={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      reading: { ...prev.reading, fictionPagesText: value },
-                    }));
-                  }}
-                />
-              </div>
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Label>Book title</Label>
+                      <Input placeholder="e.g., Meditations" ref={readingTitleRef} />
+                    </div>
+                    <div>
+                      <Label>Pages read</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="e.g., 20"
+                        ref={readingPagesRef}
+                      />
+                    </div>
+                    <div>
+                      <Label>Fiction pages</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="e.g., 10"
+                        ref={readingFictionRef}
+                      />
+                    </div>
+                    <div>
+                      <Label>Non-fiction pages</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="e.g., 10"
+                        ref={readingNonfictionRef}
+                      />
+                    </div>
+                    <div>
+                      <Label>Favorite quote (optional)</Label>
+                      <Input placeholder="Paste a line that hit." ref={readingQuoteRef} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Commentary (optional)</Label>
+                      <textarea
+                        rows={4}
+                        placeholder="Quick thoughts, what you learned, what you’ll apply…"
+                        ref={readingNoteRef}
+                        className="w-full px-3 py-2 rounded-xl bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <Label>Non-fiction pages</Label>
-                <Input
-                  inputMode="numeric"
-                  placeholder="e.g., 10"
-                  defaultValue={data.reading.nonfictionPagesText ?? ""}
-                  onBlur={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      reading: { ...prev.reading, nonfictionPagesText: value },
-                    }));
-                  }}
-                />
-              </div>
+                  <div className="mt-6 flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        const title = readingTitleRef.current?.value ?? "";
+                        const pages = Number(readingPagesRef.current?.value ?? 0) || 0;
+                        const fiction = Number(readingFictionRef.current?.value ?? 0) || 0;
+                        const nonfiction =
+                          Number(readingNonfictionRef.current?.value ?? 0) || 0;
+                        const quote = readingQuoteRef.current?.value ?? "";
+                        const note = readingNoteRef.current?.value ?? "";
 
-              <div>
-                <Label>Favorite quote (optional)</Label>
-                <Input
-                  placeholder="Paste a line that hit."
-                  defaultValue={data.reading.quote ?? ""}
-                  onBlur={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      reading: { ...prev.reading, quote: value },
-                    }));
-                  }}
-                />
-              </div>
+                        const newEvent: ReadingEvent = {
+                          id: id(),
+                          title: title.trim() || undefined,
+                          pages: pages || undefined,
+                          fictionPages: fiction || undefined,
+                          nonfictionPages: nonfiction || undefined,
+                          quote: quote.trim() || undefined,
+                          note: note.trim() || undefined,
+                        };
 
-              <div className="md:col-span-2">
-                <Label>Commentary (optional)</Label>
-                <TextArea
-                  rows={4}
-                  placeholder="Quick thoughts, what you learned, what you’ll apply…"
-                  defaultValue={data.reading.note ?? ""}
-                  onBlur={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      reading: { ...prev.reading, note: value },
-                    }));
-                  }}
-                />
+                        setData((prev) => ({
+                          ...prev,
+                          reading: {
+                            ...prev.reading,
+                            events: [...(prev.reading.events ?? []), newEvent],
+                          },
+                        }));
+
+                        if (readingTitleRef.current) readingTitleRef.current.value = "";
+                        if (readingPagesRef.current) readingPagesRef.current.value = "";
+                        if (readingFictionRef.current) readingFictionRef.current.value = "";
+                        if (readingNonfictionRef.current) readingNonfictionRef.current.value =
+                          "";
+                        if (readingQuoteRef.current) readingQuoteRef.current.value = "";
+                        if (readingNoteRef.current) readingNoteRef.current.value = "";
+
+                        setReadingOpen(false);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 transition"
+                    >
+                      Save reading event
+                    </button>
+                    <button
+                      onClick={() => setReadingOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               </div>
+            ) : null}
+
+            <div className="mt-4 space-y-2">
+              {readingEvents.length === 0 ? (
+                <div className="text-gray-500 text-sm">No reading events yet.</div>
+              ) : (
+                readingEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3 text-sm"
+                  >
+                    <div className="text-gray-200 font-semibold">
+                      {event.title || "Reading"}
+                    </div>
+                    <div className="text-gray-400 mt-1">
+                      {event.pages ? `${event.pages} pages` : "Pages not set"}
+                      {event.fictionPages
+                        ? ` • Fiction ${event.fictionPages}`
+                        : ""}
+                      {event.nonfictionPages
+                        ? ` • Non-fiction ${event.nonfictionPages}`
+                        : ""}
+                    </div>
+                    {event.quote ? (
+                      <div className="text-gray-400 mt-1">“{event.quote}”</div>
+                    ) : null}
+                    {event.note ? (
+                      <div className="text-gray-500 mt-1">{event.note}</div>
+                    ) : null}
+                    <div className="mt-2">
+                      <button
+                        onClick={() =>
+                          setData((prev) => ({
+                            ...prev,
+                            reading: {
+                              ...prev.reading,
+                              events: (prev.reading.events ?? []).filter(
+                                (item) => item.id !== event.id
+                              ),
+                            },
+                          }))
+                        }
+                        className="text-gray-400 hover:text-white"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
         </div>

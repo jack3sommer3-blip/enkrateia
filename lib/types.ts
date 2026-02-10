@@ -33,6 +33,7 @@ export type DayData = {
     proteinText?: string;
   };
   reading: {
+    events?: ReadingEvent[];
     title?: string;
     pagesText?: string;
     fictionPagesText?: string;
@@ -88,4 +89,14 @@ export type DrinkingEvent = {
   drinks: number;
   note?: string | null;
   created_at?: string | null;
+};
+
+export type ReadingEvent = {
+  id: string;
+  title?: string;
+  pages?: number;
+  fictionPages?: number;
+  nonfictionPages?: number;
+  quote?: string;
+  note?: string;
 };
