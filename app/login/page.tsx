@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAuthRedirectUrl } from "@/lib/authRedirect";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,9 +16,10 @@ export default function LoginPage() {
 
   const signInWithGoogle = async () => {
     setError(null);
+    const redirectTo = getAuthRedirectUrl();
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo },
     });
   };
 
@@ -39,10 +41,11 @@ export default function LoginPage() {
       return;
     }
 
+    const redirectTo = getAuthRedirectUrl();
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/` },
+      options: { emailRedirectTo: redirectTo },
     });
     setLoading(false);
     if (signUpError) {
