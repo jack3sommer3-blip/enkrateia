@@ -217,7 +217,7 @@ export default function ActivityPost({
                   </div>
                   <div className="text-sm text-gray-200">{comment.body}</div>
                 </div>
-                {comment.user_id === currentUserId ? (
+                {comment.author_id === currentUserId ? (
                   <button
                     onClick={() => onDeleteComment(comment)}
                     className="text-gray-500 hover:text-white transition"

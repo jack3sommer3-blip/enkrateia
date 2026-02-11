@@ -394,8 +394,8 @@ export async function toggleLike(feedItemId: string, liked: boolean, userId: str
 export async function addComment(feedItemId: string, body: string, userId: string) {
   const { data, error } = await supabase
     .from("comments")
-    .insert({ feed_item_id: feedItemId, body, user_id: userId })
-    .select("id, user_id, feed_item_id, body, created_at")
+    .insert({ feed_item_id: feedItemId, body, author_id: userId })
+    .select("id, author_id, feed_item_id, body, created_at")
     .single();
   if (error) return { comment: undefined, error };
   return { comment: data as Comment, error: null };
@@ -409,7 +409,7 @@ export async function deleteComment(commentId: string) {
 export async function listComments(feedItemId: string) {
   const { data, error } = await supabase
     .from("comments")
-    .select("id, user_id, feed_item_id, body, created_at, profiles:user_id(username, display_name, profile_photo_url)")
+    .select("id, author_id, feed_item_id, body, created_at, profiles:author_id(username, display_name, profile_photo_url)")
     .eq("feed_item_id", feedItemId)
     .order("created_at", { ascending: true });
   if (error) return [];

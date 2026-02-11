@@ -148,7 +148,7 @@ export type Like = {
 
 export type Comment = {
   id: string;
-  user_id: string;
+  author_id: string;
   feed_item_id: string;
   body: string;
   created_at: string;

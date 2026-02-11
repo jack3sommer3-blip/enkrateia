@@ -261,7 +261,7 @@ export default function PublicProfilePage() {
                           className="text-sm text-gray-300 flex items-center justify-between"
                         >
                           <span>{comment.body}</span>
-                          {comment.user_id === userId ? (
+                          {comment.author_id === userId ? (
                             <button
                               onClick={async () => {
                                 const ok = await deleteComment(comment.id);
