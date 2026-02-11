@@ -212,10 +212,38 @@ export default function ActivityPost({
             comments.map((comment) => (
               <div key={comment.id} className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-xs text-gray-400">
-                    {comment.profiles?.display_name ?? comment.profiles?.username ?? "User"}
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <Link
+                      href={`/u/${comment.profiles?.username ?? ""}`}
+                      className="flex items-center gap-2 hover:text-white transition"
+                    >
+                      <span className="h-6 w-6 rounded-full border border-white/10 bg-slate-800 overflow-hidden">
+                        {comment.profiles?.profile_photo_url ? (
+                          <img
+                            src={comment.profiles.profile_photo_url}
+                            alt={comment.profiles?.username ?? "User"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : null}
+                      </span>
+                      <span>
+                        {comment.profiles?.display_name ??
+                          comment.profiles?.username ??
+                          "User"}
+                      </span>
+                    </Link>
+                    <span className="text-gray-600">•</span>
+                    <span>
+                      {new Date(comment.created_at).toLocaleString("en-US", {
+                        timeZone: "America/Chicago",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
                   </div>
-                  <div className="text-sm text-gray-200">{comment.body}</div>
+                  <div className="text-sm text-gray-200 mt-1">{comment.body}</div>
                 </div>
                 {comment.author_id === currentUserId ? (
                   <button

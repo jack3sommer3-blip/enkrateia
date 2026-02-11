@@ -409,7 +409,9 @@ export async function deleteComment(commentId: string) {
 export async function listComments(feedItemId: string) {
   const { data, error } = await supabase
     .from("comments")
-    .select("id, author_id, feed_item_id, body, created_at, profiles:author_id(username, display_name, profile_photo_url)")
+    .select(
+      "id, author_id, feed_item_id, body, created_at, profiles:author_id(username, display_name, profile_photo_url)"
+    )
     .eq("feed_item_id", feedItemId)
     .order("created_at", { ascending: true });
   if (error) return [];
@@ -417,6 +419,10 @@ export async function listComments(feedItemId: string) {
     ...row,
     profiles: Array.isArray(row.profiles) ? row.profiles[0] : row.profiles,
   })) as Comment[];
+}
+
+export async function getCommentsForPost(feedItemId: string) {
+  return listComments(feedItemId);
 }
 
 export async function getLikesForFeed(feedItemIds: string[]) {

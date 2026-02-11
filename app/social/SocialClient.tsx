@@ -13,6 +13,7 @@ import {
   deleteActivity,
   deleteComment,
   getActivityDebug,
+  getCommentsForPost,
   getFeedActivityStream,
   getLikesForFeed,
   ensureFeedItemIdForActivity,
@@ -209,11 +210,33 @@ export default function SocialClient() {
                       }
                     }}
                     onLoadComments={async () => {
-                      if (!feedId) return;
-                      const existing = comments[feedId];
-                      if (existing) return;
-                      const list = await listComments(feedId);
-                      setComments((prev) => ({ ...prev, [feedId]: list }));
+                      let resolvedFeedId = feedId;
+                      if (!resolvedFeedId) {
+                        resolvedFeedId = await ensureFeedItemIdForActivity(item);
+                        if (resolvedFeedId) {
+                          setActivityItems((prev) =>
+                            prev.map((it) =>
+                              it.event_id === item.event_id &&
+                              it.event_type === item.event_type &&
+                              it.user_id === item.user_id
+                                ? { ...it, feed_item_id: resolvedFeedId }
+                                : it
+                            )
+                          );
+                          setSelfItems((prev) =>
+                            prev.map((it) =>
+                              it.event_id === item.event_id &&
+                              it.event_type === item.event_type &&
+                              it.user_id === item.user_id
+                                ? { ...it, feed_item_id: resolvedFeedId }
+                                : it
+                            )
+                          );
+                        }
+                      }
+                      if (!resolvedFeedId) return;
+                      const list = await getCommentsForPost(resolvedFeedId);
+                      setComments((prev) => ({ ...prev, [resolvedFeedId]: list }));
                     }}
                     onAddComment={async (body) => {
                       let resolvedFeedId = feedId;
@@ -509,11 +532,33 @@ export default function SocialClient() {
                             }
                           }}
                           onLoadComments={async () => {
-                            if (!feedId) return;
-                            const existing = comments[feedId];
-                            if (existing) return;
-                            const list = await listComments(feedId);
-                            setComments((prev) => ({ ...prev, [feedId]: list }));
+                            let resolvedFeedId = feedId;
+                            if (!resolvedFeedId) {
+                              resolvedFeedId = await ensureFeedItemIdForActivity(item);
+                              if (resolvedFeedId) {
+                                setSelfItems((prev) =>
+                                  prev.map((it) =>
+                                    it.event_id === item.event_id &&
+                                    it.event_type === item.event_type &&
+                                    it.user_id === item.user_id
+                                      ? { ...it, feed_item_id: resolvedFeedId }
+                                      : it
+                                  )
+                                );
+                                setActivityItems((prev) =>
+                                  prev.map((it) =>
+                                    it.event_id === item.event_id &&
+                                    it.event_type === item.event_type &&
+                                    it.user_id === item.user_id
+                                      ? { ...it, feed_item_id: resolvedFeedId }
+                                      : it
+                                  )
+                                );
+                              }
+                            }
+                            if (!resolvedFeedId) return;
+                            const list = await getCommentsForPost(resolvedFeedId);
+                            setComments((prev) => ({ ...prev, [resolvedFeedId]: list }));
                           }}
                           onAddComment={async (body) => {
                             let resolvedFeedId = feedId;

@@ -258,8 +258,39 @@ export default function PublicProfilePage() {
                     {comments[item.id].map((comment) => (
                         <div
                           key={comment.id}
-                          className="text-sm text-gray-300 flex items-center justify-between"
+                          className="text-sm text-gray-300 flex items-center justify-between gap-3"
                         >
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/u/${comment.profiles?.username ?? ""}`}
+                              className="flex items-center gap-2 hover:text-white transition"
+                            >
+                              <span className="h-6 w-6 rounded-full border border-white/10 bg-slate-800 overflow-hidden">
+                                {comment.profiles?.profile_photo_url ? (
+                                  <img
+                                    src={comment.profiles.profile_photo_url}
+                                    alt={comment.profiles?.username ?? "User"}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : null}
+                              </span>
+                              <span>
+                                {comment.profiles?.display_name ??
+                                  comment.profiles?.username ??
+                                  "User"}
+                              </span>
+                            </Link>
+                            <span className="text-gray-600">•</span>
+                            <span>
+                              {new Date(comment.created_at).toLocaleString("en-US", {
+                                timeZone: "America/Chicago",
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
                           <span>{comment.body}</span>
                           {comment.author_id === userId ? (
                             <button
