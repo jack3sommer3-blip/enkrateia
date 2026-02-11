@@ -80,11 +80,13 @@ export default function DailyLog({
   userId,
   title,
   embedded = false,
+  showLabel = true,
 }: {
   dateKey: string;
   userId: string;
   title?: string;
   embedded?: boolean;
+  showLabel?: boolean;
 }) {
   const [data, setData] = useState<DayData>(DEFAULT_DATA);
   const [hydrated, setHydrated] = useState(false);
@@ -434,9 +436,11 @@ export default function DailyLog({
     <div className="w-full max-w-4xl">
         <header className="mb-10">
           <div className="flex flex-col gap-3">
-            <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
-              Daily Log
-            </div>
+            {showLabel ? (
+              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
+                Daily Log
+              </div>
+            ) : null}
             <h1 className="text-4xl md:text-5xl font-bold tracking-wide leading-none">
               {title ?? "Daily Log"}
             </h1>

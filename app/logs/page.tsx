@@ -203,24 +203,20 @@ export default function LogsPage() {
                     ].join(" ")}
                   >
                     <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:80px_80px] opacity-20" />
-                    <div className="relative h-full p-2 grid grid-rows-[auto_1fr]">
-                      <div className="text-xs text-gray-500">{date.getDate()}</div>
-                      <div className="flex flex-col items-center justify-center">
-                        {row ? (
-                          <>
-                            <div className="text-2xl font-semibold text-white">
-                              {row.total_score.toFixed(0)}
-                            </div>
-                            <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 opacity-70">
-                              /100
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-[10px] uppercase tracking-[0.3em] text-gray-700">
-                            No log
-                          </div>
-                        )}
+                    <div className="relative h-full p-2">
+                      <div className="absolute left-2 top-2 text-xs text-gray-500">
+                        {date.getDate()}
                       </div>
+                      {row ? (
+                        <div className="h-full flex flex-col items-center justify-center pb-2">
+                          <div className="text-2xl font-semibold text-white">
+                            {row.total_score.toFixed(0)}
+                          </div>
+                          <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 opacity-70">
+                            /100
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </button>
                 );
@@ -240,13 +236,12 @@ export default function LogsPage() {
               <div className="mt-2 h-px bg-white/10" />
               {selectedRow ? (
                 <div className="mt-3 space-y-3 text-sm">
-                  {[
-                    { label: "Exercise", score: selectedRow.workout_score },
-                    { label: "Sleep", score: selectedRow.sleep_score },
-                    { label: "Diet", score: selectedRow.diet_score },
-                    { label: "Reading", score: selectedRow.reading_score },
-                  ].map((category) => {
-                    const status = statusLabel(category.score);
+                {[
+                  { label: "Exercise", score: selectedRow.workout_score },
+                  { label: "Sleep", score: selectedRow.sleep_score },
+                  { label: "Diet", score: selectedRow.diet_score },
+                  { label: "Reading", score: selectedRow.reading_score },
+                ].map((category) => {
                     const percent = Math.min(100, Math.max(0, (category.score / 25) * 100));
                     return (
                       <div
@@ -264,9 +259,6 @@ export default function LogsPage() {
                           <div className="text-right">
                             <div className="text-sm font-semibold text-white">
                               {category.score.toFixed(0)} / 25
-                            </div>
-                            <div className={`${status.color} text-[11px] uppercase tracking-[0.25em]`}>
-                              {status.label}
                             </div>
                           </div>
                         </div>
@@ -291,6 +283,7 @@ export default function LogsPage() {
               userId={userId}
               title={`Daily Log — ${selectedDate}`}
               embedded
+              showLabel={false}
             />
           </div>
         </section>
