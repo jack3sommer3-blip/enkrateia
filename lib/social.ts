@@ -431,7 +431,8 @@ function activityFromWorkout(
   userId: string,
   dateKey: string,
   activity: WorkoutActivity,
-  index: number
+  index: number,
+  createdAt?: string | null
 ): ActivityItem {
   const eventId = ensureUuid(activity.id, `${dateKey}-workout-${index}`);
   return {
@@ -440,7 +441,7 @@ function activityFromWorkout(
     event_type: "workout",
     event_id: eventId,
     event_date: dateKey,
-    created_at: makeCreatedAt(dateKey),
+    created_at: createdAt ?? makeCreatedAt(dateKey),
     summary: workoutSummary(activity) || "Workout",
     metadata: {
       activityType: activity.type,
@@ -456,7 +457,8 @@ function activityFromReading(
   userId: string,
   dateKey: string,
   event: ReadingEvent,
-  index: number
+  index: number,
+  createdAt?: string | null
 ): ActivityItem {
   const eventId = ensureUuid(event.id, `${dateKey}-reading-${index}`);
   return {
@@ -465,7 +467,7 @@ function activityFromReading(
     event_type: "reading",
     event_id: eventId,
     event_date: dateKey,
-    created_at: makeCreatedAt(dateKey),
+    created_at: createdAt ?? makeCreatedAt(dateKey),
     summary: readingSummary(event) || "Reading",
     metadata: {
       title: event.title,
@@ -487,7 +489,7 @@ export async function getSelfActivityStream(
 
   const { data: logs, error: logsError } = await supabase
     .from("daily_logs")
-    .select("date,data")
+    .select("date,data,updated_at")
     .eq("user_id", userId)
     .gte("date", startKey);
 
@@ -495,19 +497,20 @@ export async function getSelfActivityStream(
 
   const items: ActivityItem[] = [];
 
-  (logs ?? []).forEach((row: { date: string; data: DayData }) => {
+  (logs ?? []).forEach((row: { date: string; data: DayData; updated_at?: string | null }) => {
     const data = row.data;
     const dateKey = row.date;
+    const createdAt = row.updated_at ?? undefined;
 
     const activities = data?.workouts?.activities ?? [];
     activities.forEach((activity, index) => {
-      items.push(activityFromWorkout(userId, dateKey, activity, index));
+      items.push(activityFromWorkout(userId, dateKey, activity, index, createdAt));
     });
 
     const readingEvents = data?.reading?.events ?? [];
     if (readingEvents.length > 0) {
       readingEvents.forEach((event, index) => {
-        items.push(activityFromReading(userId, dateKey, event, index));
+        items.push(activityFromReading(userId, dateKey, event, index, createdAt));
       });
     } else if (data?.reading?.title || data?.reading?.pagesText) {
       const pages = intFromText(data.reading.pagesText) ?? 0;
@@ -518,7 +521,7 @@ export async function getSelfActivityStream(
         event_type: "reading",
         event_id: eventId,
         event_date: dateKey,
-        created_at: makeCreatedAt(dateKey),
+        created_at: createdAt ?? makeCreatedAt(dateKey),
         summary: readingSummary({
           id: eventId,
           title: data.reading.title,
@@ -679,6 +682,18 @@ export async function deleteActivity(
   viewerId: string,
   item: ActivityItem
 ): Promise<{ ok: boolean; error?: string }> {
+  // Root cause (Bug 1): delete handlers were firing but wrong payload/table left the post intact.
+  // Keep a single path here and ensure the same mutation is used across surfaces.
+  if (process.env.NODE_ENV !== "production") {
+    // Temporary debug trace.
+    console.debug("[deleteActivity]", {
+      viewerId,
+      eventType: item.event_type,
+      eventId: item.event_id,
+      eventDate: item.event_date,
+      feedItemId: item.feed_item_id,
+    });
+  }
   if (item.user_id !== viewerId) return { ok: false, error: "Not authorized" };
 
   if (item.event_type === "drinking") {
@@ -690,48 +705,65 @@ export async function deleteActivity(
       .select("data")
       .eq("user_id", viewerId)
       .eq("date", item.event_date)
-      .single();
+      .maybeSingle();
 
     if (error) return { ok: false, error: error.message };
-    const dataValue = (data?.data ?? {}) as DayData;
+    if (!data?.data) {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[deleteActivity] daily_logs row not found", {
+          userId: viewerId,
+          date: item.event_date,
+        });
+      }
+    } else {
+      const dataValue = (data?.data ?? {}) as DayData;
+      let changed = false;
 
-    if (item.event_type === "workout") {
-      const activities = dataValue?.workouts?.activities ?? [];
-      dataValue.workouts = {
-        ...dataValue.workouts,
-        activities: activities.filter((activity) => activity.id !== item.event_id),
-      };
-    }
-
-    if (item.event_type === "reading") {
-      const events = dataValue?.reading?.events ?? [];
-      dataValue.reading = {
-        ...dataValue.reading,
-        events: events.filter((event) => event.id !== item.event_id),
-      };
-      const legacyId = stableUuid(`${item.event_date}-reading-legacy`);
-      if (item.event_id === legacyId) {
-        dataValue.reading = {
-          ...dataValue.reading,
-          title: undefined,
-          pagesText: undefined,
-          fictionPagesText: undefined,
-          nonfictionPagesText: undefined,
-          note: undefined,
-          quote: undefined,
+      if (item.event_type === "workout") {
+        const activities = dataValue?.workouts?.activities ?? [];
+        const next = activities.filter((activity) => activity.id !== item.event_id);
+        changed = changed || next.length !== activities.length;
+        dataValue.workouts = {
+          ...dataValue.workouts,
+          activities: next,
         };
       }
-    }
 
-    const { error: saveError } = await supabase.from("daily_logs").upsert(
-      {
-        user_id: viewerId,
-        date: item.event_date,
-        data: dataValue,
-      },
-      { onConflict: "user_id,date" }
-    );
-    if (saveError) return { ok: false, error: saveError.message };
+      if (item.event_type === "reading") {
+        const events = dataValue?.reading?.events ?? [];
+        const next = events.filter((event) => event.id !== item.event_id);
+        changed = changed || next.length !== events.length;
+        dataValue.reading = {
+          ...dataValue.reading,
+          events: next,
+        };
+        const legacyId = stableUuid(`${item.event_date}-reading-legacy`);
+        if (item.event_id === legacyId) {
+          changed = true;
+          dataValue.reading = {
+            ...dataValue.reading,
+            title: undefined,
+            pagesText: undefined,
+            fictionPagesText: undefined,
+            nonfictionPagesText: undefined,
+            note: undefined,
+            quote: undefined,
+          };
+        }
+      }
+
+      if (changed) {
+        const { error: saveError } = await supabase.from("daily_logs").upsert(
+          {
+            user_id: viewerId,
+            date: item.event_date,
+            data: dataValue,
+          },
+          { onConflict: "user_id,date" }
+        );
+        if (saveError) return { ok: false, error: saveError.message };
+      }
+    }
   }
 
   if (item.feed_item_id) {

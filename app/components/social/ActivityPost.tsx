@@ -122,7 +122,14 @@ export default function ActivityPost({
   const createdLabel = useMemo(() => {
     // Debug notes: if created_at is date-only, it renders as 6:00 AM local.
     // We prefer true created_at from feed_items when available.
-    return new Date(item.created_at).toLocaleString();
+    return new Date(item.created_at).toLocaleString("en-US", {
+      timeZone: "America/Chicago",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }, [item.created_at]);
 
   return (

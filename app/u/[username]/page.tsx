@@ -202,7 +202,14 @@ export default function PublicProfilePage() {
                   <div className="text-gray-400 text-sm">{item.event_type}</div>
                   <div className="text-white font-semibold mt-1">{item.summary}</div>
                   <div className="text-gray-500 text-sm mt-1">
-                    {new Date(item.created_at).toLocaleString()}
+                    {new Date(item.created_at).toLocaleString("en-US", {
+                      timeZone: "America/Chicago",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
                   </div>
                   <div className="mt-3 flex items-center gap-4 text-sm text-gray-400">
                     <button

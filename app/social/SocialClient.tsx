@@ -57,6 +57,7 @@ export default function SocialClient() {
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
   const [debugInfo, setDebugInfo] = useState<Awaited<ReturnType<typeof getActivityDebug>> | null>(null);
   const [activityErrors, setActivityErrors] = useState<string[]>([]);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -234,6 +235,15 @@ export default function SocialClient() {
                       }
                     }}
                     onDeletePost={async () => {
+                      if (process.env.NODE_ENV !== "production") {
+                        console.debug("[Feed] delete click", {
+                          userId,
+                          eventType: item.event_type,
+                          eventId: item.event_id,
+                          eventDate: item.event_date,
+                          feedItemId: item.feed_item_id,
+                        });
+                      }
                       const res = await deleteActivity(userId, item);
                       if (res.ok) {
                         setActivityItems((prev) =>
@@ -256,14 +266,19 @@ export default function SocialClient() {
                               )
                           )
                         );
+                        setDeleteError(null);
                       } else {
                         console.error("Delete activity failed", res.error);
+                        setDeleteError(res.error ?? "Delete failed");
                       }
                     }}
                   />
                 );
               })
             )}
+            {deleteError ? (
+              <div className="text-sm text-rose-300">Delete failed: {deleteError}</div>
+            ) : null}
             {(process.env.NODE_ENV !== "production" ||
               searchParams.get("debug") === "1") && debugInfo ? (
               <div className="command-surface rounded-md p-4 text-xs text-gray-400">
@@ -479,6 +494,15 @@ export default function SocialClient() {
                             }
                           }}
                           onDeletePost={async () => {
+                            if (process.env.NODE_ENV !== "production") {
+                              console.debug("[Profile] delete click", {
+                                userId,
+                                eventType: item.event_type,
+                                eventId: item.event_id,
+                                eventDate: item.event_date,
+                                feedItemId: item.feed_item_id,
+                              });
+                            }
                             const res = await deleteActivity(userId, item);
                             if (res.ok) {
                               setSelfItems((prev) =>
@@ -488,7 +512,7 @@ export default function SocialClient() {
                                       it.user_id === item.user_id &&
                                       it.event_type === item.event_type &&
                                       it.event_id === item.event_id
-                                    )
+                                      )
                                 )
                               );
                               setActivityItems((prev) =>
@@ -498,11 +522,13 @@ export default function SocialClient() {
                                       it.user_id === item.user_id &&
                                       it.event_type === item.event_type &&
                                       it.event_id === item.event_id
-                                    )
+                                      )
                                 )
                               );
+                              setDeleteError(null);
                             } else {
                               console.error("Delete activity failed", res.error);
+                              setDeleteError(res.error ?? "Delete failed");
                             }
                           }}
                         />
