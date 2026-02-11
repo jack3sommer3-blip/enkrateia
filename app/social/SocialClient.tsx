@@ -264,6 +264,7 @@ export default function SocialClient() {
                         await getCommentsForPost(resolvedFeedId);
                       if (error) return;
                       setComments((prev) => ({ ...prev, [resolvedFeedId]: list }));
+                      setCommentCounts((prev) => ({ ...prev, [resolvedFeedId]: list.length }));
                     }}
                     onAddComment={async (body) => {
                       let resolvedFeedId = feedId;
@@ -308,14 +309,14 @@ export default function SocialClient() {
                           ...prev,
                           [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), comment],
                         }));
-                        setCommentCounts((prev) => ({
-                          ...prev,
-                          [resolvedFeedId]: (prev[resolvedFeedId] ?? 0) + 1,
-                        }));
                         const { comments: fresh, error: loadError } =
                           await getCommentsForPost(resolvedFeedId);
                         if (!loadError) {
                           setComments((prev) => ({ ...prev, [resolvedFeedId]: fresh }));
+                          setCommentCounts((prev) => ({
+                            ...prev,
+                            [resolvedFeedId]: fresh.length,
+                          }));
                         }
                         return { ok: true };
                       }
@@ -333,10 +334,15 @@ export default function SocialClient() {
                           ...prev,
                           [feedId]: (prev[feedId] ?? []).filter((c) => c.id !== comment.id),
                         }));
-                        setCommentCounts((prev) => ({
-                          ...prev,
-                          [feedId]: Math.max(0, (prev[feedId] ?? 1) - 1),
-                        }));
+                        const { comments: fresh, error: loadError } =
+                          await getCommentsForPost(feedId);
+                        if (!loadError) {
+                          setComments((prev) => ({ ...prev, [feedId]: fresh }));
+                          setCommentCounts((prev) => ({
+                            ...prev,
+                            [feedId]: fresh.length,
+                          }));
+                        }
                       }
                     }}
                     onDeletePost={async () => {
@@ -465,7 +471,14 @@ export default function SocialClient() {
         ) : null}
 
         {activeTab === "Profile" ? (
-          <ProfileView username={profile?.username} viewerId={userId} />
+          <ProfileView
+            username={profile?.username}
+            viewerId={userId}
+            commentCounts={commentCounts}
+            onCommentCountChange={(feedItemId, count) => {
+              setCommentCounts((prev) => ({ ...prev, [feedItemId]: count }));
+            }}
+          />
         ) : null}
       </div>
     </main>

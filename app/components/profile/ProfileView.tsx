@@ -20,9 +20,16 @@ import type { ActivityItem, Comment, Like, Profile } from "@/lib/types";
 type ProfileViewProps = {
   username?: string;
   viewerId?: string;
+  commentCounts?: Record<string, number>;
+  onCommentCountChange?: (feedItemId: string, count: number) => void;
 };
 
-export default function ProfileView({ username, viewerId }: ProfileViewProps) {
+export default function ProfileView({
+  username,
+  viewerId,
+  commentCounts: externalCounts,
+  onCommentCountChange,
+}: ProfileViewProps) {
   const [profile, setProfile] = useState<Profile | undefined>();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ActivityItem[]>([]);
@@ -80,7 +87,14 @@ export default function ProfileView({ username, viewerId }: ProfileViewProps) {
         setLiked(likedMap);
       }
       const counts = await getCommentCounts(feedIds);
-      if (active) setCommentCounts(counts);
+      if (active) {
+        setCommentCounts(counts);
+        if (onCommentCountChange) {
+          Object.entries(counts).forEach(([id, count]) =>
+            onCommentCountChange(id, count)
+          );
+        }
+      }
     };
     load();
     return () => {
@@ -147,7 +161,10 @@ export default function ProfileView({ username, viewerId }: ProfileViewProps) {
               items.map((item) => {
                 const feedId = item.feed_item_id;
                 const commentCount = feedId
-                  ? commentCounts[feedId] ?? comments[feedId]?.length ?? 0
+                  ? externalCounts?.[feedId] ??
+                    commentCounts[feedId] ??
+                    comments[feedId]?.length ??
+                    0
                   : 0;
                 return (
                   <ActivityPost
@@ -202,6 +219,7 @@ export default function ProfileView({ username, viewerId }: ProfileViewProps) {
                         await getCommentsForPost(resolvedFeedId);
                       if (error) return;
                       setComments((prev) => ({ ...prev, [resolvedFeedId]: list }));
+                      onCommentCountChange?.(resolvedFeedId, list.length);
                     }}
                     onAddComment={async (body) => {
                       if (!viewerId) return { ok: false, error: "Sign in to comment." };
@@ -234,14 +252,11 @@ export default function ProfileView({ username, viewerId }: ProfileViewProps) {
                           ...prev,
                           [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), comment],
                         }));
-                        setCommentCounts((prev) => ({
-                          ...prev,
-                          [resolvedFeedId]: (prev[resolvedFeedId] ?? 0) + 1,
-                        }));
                         const { comments: fresh, error: loadError } =
                           await getCommentsForPost(resolvedFeedId);
                         if (!loadError) {
                           setComments((prev) => ({ ...prev, [resolvedFeedId]: fresh }));
+                          onCommentCountChange?.(resolvedFeedId, fresh.length);
                         }
                         return { ok: true };
                       }
@@ -258,10 +273,12 @@ export default function ProfileView({ username, viewerId }: ProfileViewProps) {
                           ...prev,
                           [feedId]: (prev[feedId] ?? []).filter((c) => c.id !== comment.id),
                         }));
-                        setCommentCounts((prev) => ({
-                          ...prev,
-                          [feedId]: Math.max(0, (prev[feedId] ?? 1) - 1),
-                        }));
+                        const { comments: fresh, error: loadError } =
+                          await getCommentsForPost(feedId);
+                        if (!loadError) {
+                          setComments((prev) => ({ ...prev, [feedId]: fresh }));
+                          onCommentCountChange?.(feedId, fresh.length);
+                        }
                       }
                     }}
                     onDeletePost={async () => {
