@@ -122,6 +122,19 @@ export async function upsertFeedItem(input: {
   return data as FeedItem;
 }
 
+export async function ensureFeedItemIdForActivity(item: ActivityItem) {
+  if (item.feed_item_id) return item.feed_item_id;
+  const created = await upsertFeedItem({
+    user_id: item.user_id,
+    event_date: item.event_date,
+    event_type: item.event_type,
+    event_id: item.event_id,
+    summary: item.summary,
+    metadata: item.metadata ?? {},
+  });
+  return created?.id;
+}
+
 function stableUuid(seed: string) {
   const hash = (input: string, seedNum: number) => {
     let h = seedNum >>> 0;

@@ -111,12 +111,13 @@ export default function ActivityPost({
   currentUserId: string;
   onToggleLike: () => void;
   onLoadComments: () => void;
-  onAddComment: (body: string) => void;
+  onAddComment: (body: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteComment: (comment: Comment) => void;
   onDeletePost: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [body, setBody] = useState("");
+  const [commentError, setCommentError] = useState<string | null>(null);
   const title = useMemo(() => formatTitle(item), [item]);
   const chipValues = useMemo(() => chipsFor(item), [item]);
   const createdLabel = useMemo(() => {
@@ -241,14 +242,23 @@ export default function ActivityPost({
               onClick={() => {
                 const trimmed = body.trim();
                 if (!trimmed) return;
-                onAddComment(trimmed);
-                setBody("");
+                onAddComment(trimmed).then((res) => {
+                  if (res.ok) {
+                    setBody("");
+                    setCommentError(null);
+                  } else {
+                    setCommentError(res.error ?? "Failed to add comment");
+                  }
+                });
               }}
               className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-sm"
             >
               Send
             </button>
           </div>
+          {commentError ? (
+            <div className="text-xs text-rose-300">{commentError}</div>
+          ) : null}
         </div>
       ) : null}
     </div>

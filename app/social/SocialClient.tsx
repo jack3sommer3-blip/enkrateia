@@ -15,6 +15,7 @@ import {
   getActivityDebug,
   getFeedActivityStream,
   getLikesForFeed,
+  ensureFeedItemIdForActivity,
   listComments,
   listFollowers,
   listFollowing,
@@ -215,14 +216,48 @@ export default function SocialClient() {
                       setComments((prev) => ({ ...prev, [feedId]: list }));
                     }}
                     onAddComment={async (body) => {
-                      if (!feedId) return;
-                      const created = await addComment(feedId, body, userId);
+                      let resolvedFeedId = feedId;
+                      if (!resolvedFeedId) {
+                        resolvedFeedId = await ensureFeedItemIdForActivity(item);
+                        if (resolvedFeedId) {
+                          setActivityItems((prev) =>
+                            prev.map((it) =>
+                              it.event_id === item.event_id &&
+                              it.event_type === item.event_type &&
+                              it.user_id === item.user_id
+                                ? { ...it, feed_item_id: resolvedFeedId }
+                                : it
+                            )
+                          );
+                          setSelfItems((prev) =>
+                            prev.map((it) =>
+                              it.event_id === item.event_id &&
+                              it.event_type === item.event_type &&
+                              it.user_id === item.user_id
+                                ? { ...it, feed_item_id: resolvedFeedId }
+                                : it
+                            )
+                          );
+                        }
+                      }
+                      if (!resolvedFeedId) {
+                        if (process.env.NODE_ENV !== "production") {
+                          console.debug("[addComment] missing feed_item_id", {
+                            eventId: item.event_id,
+                            eventType: item.event_type,
+                          });
+                        }
+                        return { ok: false, error: "Post not ready for comments yet." };
+                      }
+                      const created = await addComment(resolvedFeedId, body, userId);
                       if (created) {
                         setComments((prev) => ({
                           ...prev,
-                          [feedId]: [...(prev[feedId] ?? []), created],
+                          [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), created],
                         }));
+                        return { ok: true };
                       }
+                      return { ok: false, error: "Failed to add comment" };
                     }}
                     onDeleteComment={async (comment) => {
                       if (!feedId) return;
@@ -465,14 +500,48 @@ export default function SocialClient() {
                             setComments((prev) => ({ ...prev, [feedId]: list }));
                           }}
                           onAddComment={async (body) => {
-                            if (!feedId) return;
-                            const created = await addComment(feedId, body, userId);
+                            let resolvedFeedId = feedId;
+                            if (!resolvedFeedId) {
+                              resolvedFeedId = await ensureFeedItemIdForActivity(item);
+                              if (resolvedFeedId) {
+                                setSelfItems((prev) =>
+                                  prev.map((it) =>
+                                    it.event_id === item.event_id &&
+                                    it.event_type === item.event_type &&
+                                    it.user_id === item.user_id
+                                      ? { ...it, feed_item_id: resolvedFeedId }
+                                      : it
+                                  )
+                                );
+                                setActivityItems((prev) =>
+                                  prev.map((it) =>
+                                    it.event_id === item.event_id &&
+                                    it.event_type === item.event_type &&
+                                    it.user_id === item.user_id
+                                      ? { ...it, feed_item_id: resolvedFeedId }
+                                      : it
+                                  )
+                                );
+                              }
+                            }
+                            if (!resolvedFeedId) {
+                              if (process.env.NODE_ENV !== "production") {
+                                console.debug("[addComment] missing feed_item_id", {
+                                  eventId: item.event_id,
+                                  eventType: item.event_type,
+                                });
+                              }
+                              return { ok: false, error: "Post not ready for comments yet." };
+                            }
+                            const created = await addComment(resolvedFeedId, body, userId);
                             if (created) {
                               setComments((prev) => ({
                                 ...prev,
-                                [feedId]: [...(prev[feedId] ?? []), created],
+                                [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), created],
                               }));
+                              return { ok: true };
                             }
+                            return { ok: false, error: "Failed to add comment" };
                           }}
                           onDeleteComment={async (comment) => {
                             if (!feedId) return;
