@@ -75,14 +75,28 @@ export default function LogsPage() {
       .lte("date", endKey)
       .order("date", { ascending: true })
       .then(({ data }) => {
-        const rows = (data ?? []).map((row) => ({
-          date: row.date,
-          total_score: Number(row.total_score ?? 0),
-          workout_score: Number(row.workout_score ?? 0),
-          sleep_score: Number(row.sleep_score ?? 0),
-          diet_score: Number(row.diet_score ?? 0),
-          reading_score: Number(row.reading_score ?? 0),
-        })) as LogRow[];
+        const todayKeyValue = todayKey();
+        const rows = (data ?? [])
+          .filter((row) => {
+            const isFuture = row.date > todayKeyValue;
+            const total = Number(row.total_score ?? 0);
+            const workout = Number(row.workout_score ?? 0);
+            const sleep = Number(row.sleep_score ?? 0);
+            const diet = Number(row.diet_score ?? 0);
+            const reading = Number(row.reading_score ?? 0);
+            if (isFuture && total === 0 && workout === 0 && sleep === 0 && diet === 0 && reading === 0) {
+              return false;
+            }
+            return true;
+          })
+          .map((row) => ({
+            date: row.date,
+            total_score: Number(row.total_score ?? 0),
+            workout_score: Number(row.workout_score ?? 0),
+            sleep_score: Number(row.sleep_score ?? 0),
+            diet_score: Number(row.diet_score ?? 0),
+            reading_score: Number(row.reading_score ?? 0),
+          })) as LogRow[];
         setLogs(rows);
         setLogsLoading(false);
       });
@@ -213,7 +227,7 @@ export default function LogsPage() {
                         {date.getDate()}
                       </div>
                       {row ? (
-                        <div className="h-full flex flex-col items-center justify-center pb-2">
+                        <div className="h-full flex flex-col items-center justify-center pb-2 pt-4">
                           <div className="text-xl font-semibold text-white">
                             {row.total_score.toFixed(0)}
                           </div>

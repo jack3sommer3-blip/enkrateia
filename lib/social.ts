@@ -600,16 +600,18 @@ export async function getFeedActivityStream(
     }))
     .filter(isValidActivityItem);
 
-  const feedMap = new Map<string, string>();
+  const feedMap = new Map<string, { id: string; created_at: string }>();
   (feedItems ?? []).forEach((item: any) => {
     const key = `${item.user_id}:${item.event_type}:${item.event_id}`;
-    feedMap.set(key, item.id);
+    feedMap.set(key, { id: item.id, created_at: item.created_at });
   });
 
   const selfWithFeed = selfItems.map((item) => {
     const key = `${item.user_id}:${item.event_type}:${item.event_id}`;
-    const feedId = feedMap.get(key);
-    return feedId ? { ...item, feed_item_id: feedId } : item;
+    const feedInfo = feedMap.get(key);
+    return feedInfo
+      ? { ...item, feed_item_id: feedInfo.id, created_at: feedInfo.created_at }
+      : item;
   });
 
   const selfFromFeed = selfItems.length === 0

@@ -59,14 +59,28 @@ export default function DashboardPage() {
       .gte("date", startKey)
       .order("date", { ascending: false })
       .then(({ data }) => {
-        const rows = (data ?? []).map((row) => ({
-          date: row.date,
-          total_score: Number(row.total_score ?? 0),
-          workout_score: Number(row.workout_score ?? 0),
-          sleep_score: Number(row.sleep_score ?? 0),
-          diet_score: Number(row.diet_score ?? 0),
-          reading_score: Number(row.reading_score ?? 0),
-        })) as LogRow[];
+        const todayKeyValue = todayKey();
+        const rows = (data ?? [])
+          .filter((row) => {
+            const isFuture = row.date > todayKeyValue;
+            const total = Number(row.total_score ?? 0);
+            const workout = Number(row.workout_score ?? 0);
+            const sleep = Number(row.sleep_score ?? 0);
+            const diet = Number(row.diet_score ?? 0);
+            const reading = Number(row.reading_score ?? 0);
+            if (isFuture && total === 0 && workout === 0 && sleep === 0 && diet === 0 && reading === 0) {
+              return false;
+            }
+            return true;
+          })
+          .map((row) => ({
+            date: row.date,
+            total_score: Number(row.total_score ?? 0),
+            workout_score: Number(row.workout_score ?? 0),
+            sleep_score: Number(row.sleep_score ?? 0),
+            diet_score: Number(row.diet_score ?? 0),
+            reading_score: Number(row.reading_score ?? 0),
+          })) as LogRow[];
         setLogs(rows);
         setLogsLoading(false);
       });

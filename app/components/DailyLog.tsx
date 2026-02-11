@@ -549,6 +549,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 8000"
                   defaultValue={data.workouts.stepsText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      workouts: { ...prev.workouts, stepsText: value },
+                    }));
+                  }}
                   onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
@@ -747,6 +754,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 7"
                   defaultValue={data.sleep.hoursText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      sleep: { ...prev.sleep, hoursText: value },
+                    }));
+                  }}
                   onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
@@ -763,6 +777,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 30"
                   defaultValue={data.sleep.minutesText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      sleep: { ...prev.sleep, minutesText: value },
+                    }));
+                  }}
                   onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
@@ -779,6 +800,16 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 52"
                   defaultValue={data.sleep.restingHrText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      sleep: {
+                        ...prev.sleep,
+                        restingHrText: value,
+                      },
+                    }));
+                  }}
                   onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
@@ -810,6 +841,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 2"
                   defaultValue={data.diet.cookedMealsText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      diet: { ...prev.diet, cookedMealsText: value },
+                    }));
+                  }}
                   onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
@@ -826,6 +864,16 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 1"
                   defaultValue={data.diet.restaurantMealsText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      diet: {
+                        ...prev.diet,
+                        restaurantMealsText: value,
+                      },
+                    }));
+                  }}
                   onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
@@ -847,6 +895,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 7"
                   defaultValue={data.diet.healthinessText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      diet: { ...prev.diet, healthinessText: value },
+                    }));
+                  }}
                   onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
@@ -862,6 +917,13 @@ export default function DailyLog({
                   inputMode="numeric"
                   placeholder="e.g., 150"
                   defaultValue={data.diet.proteinText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      diet: { ...prev.diet, proteinText: value },
+                    }));
+                  }}
                   onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
