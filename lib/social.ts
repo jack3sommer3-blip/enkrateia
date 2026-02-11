@@ -410,13 +410,13 @@ export async function listComments(feedItemId: string) {
   const debugEnabled =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("debug") === "1";
-  const { data, error } = await supabase
+
+  const { data: comments, error } = await supabase
     .from("comments")
-    .select(
-      "id, author_id, feed_item_id, body, created_at, profiles!comments_author_id_fkey(username, display_name, profile_photo_url)"
-    )
+    .select("id, author_id, feed_item_id, body, created_at")
     .eq("feed_item_id", feedItemId)
     .order("created_at", { ascending: true });
+
   if (error && process.env.NODE_ENV !== "production") {
     console.debug("[listComments] error", {
       message: error.message,
@@ -425,14 +425,40 @@ export async function listComments(feedItemId: string) {
       hint: error.hint,
     });
   }
-  if (debugEnabled) {
-    console.debug("[listComments] sample row", data?.[0]);
+
+  if (!comments || comments.length === 0) {
+    if (debugEnabled) console.debug("[listComments] empty", { feedItemId });
+    return { comments: [], error };
   }
-  if (error) return [];
-  return (data ?? []).map((row: any) => ({
+
+  const authorIds = Array.from(new Set(comments.map((c) => c.author_id)));
+  const { data: profiles, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, profile_photo_url")
+    .in("id", authorIds);
+
+  if (profileError && process.env.NODE_ENV !== "production") {
+    console.debug("[listComments] profile error", {
+      message: profileError.message,
+      code: profileError.code,
+      details: profileError.details,
+      hint: profileError.hint,
+    });
+  }
+
+  const profileMap = new Map<string, any>();
+  (profiles ?? []).forEach((p: any) => profileMap.set(p.id, p));
+
+  const merged = comments.map((row: any) => ({
     ...row,
-    profiles: Array.isArray(row.profiles) ? row.profiles[0] : row.profiles,
+    profiles: profileMap.get(row.author_id) ?? undefined,
   })) as Comment[];
+
+  if (debugEnabled) {
+    console.debug("[listComments] sample row", merged[0]);
+  }
+
+  return { comments: merged, error: error ?? profileError ?? null };
 }
 
 export async function getCommentsForPost(feedItemId: string) {

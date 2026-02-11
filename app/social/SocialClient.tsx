@@ -48,6 +48,7 @@ export default function SocialClient() {
   const [likes, setLikes] = useState<Record<string, Like[]>>({});
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [commentErrors, setCommentErrors] = useState<Record<string, string>>({});
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Profile[]>([]);
@@ -235,7 +236,20 @@ export default function SocialClient() {
                         }
                       }
                       if (!resolvedFeedId) return;
-                      const list = await getCommentsForPost(resolvedFeedId);
+                      const { comments: list, error } =
+                        await getCommentsForPost(resolvedFeedId);
+                      if (error) {
+                        setCommentErrors((prev) => ({
+                          ...prev,
+                          [resolvedFeedId]: error.message ?? "Failed to load comments",
+                        }));
+                        return;
+                      }
+                      setCommentErrors((prev) => {
+                        const next = { ...prev };
+                        delete next[resolvedFeedId as string];
+                        return next;
+                      });
                       setComments((prev) => ({ ...prev, [resolvedFeedId]: list }));
                     }}
                     onAddComment={async (body) => {
@@ -290,6 +304,11 @@ export default function SocialClient() {
                           ...prev,
                           [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), comment],
                         }));
+                        const { comments: fresh, error: loadError } =
+                          await getCommentsForPost(resolvedFeedId);
+                        if (!loadError) {
+                          setComments((prev) => ({ ...prev, [resolvedFeedId]: fresh }));
+                        }
                         return { ok: true };
                       }
                       const devSuffix =
@@ -557,7 +576,20 @@ export default function SocialClient() {
                               }
                             }
                             if (!resolvedFeedId) return;
-                            const list = await getCommentsForPost(resolvedFeedId);
+                            const { comments: list, error } =
+                              await getCommentsForPost(resolvedFeedId);
+                            if (error) {
+                              setCommentErrors((prev) => ({
+                                ...prev,
+                                [resolvedFeedId]: error.message ?? "Failed to load comments",
+                              }));
+                              return;
+                            }
+                            setCommentErrors((prev) => {
+                              const next = { ...prev };
+                              delete next[resolvedFeedId as string];
+                              return next;
+                            });
                             setComments((prev) => ({ ...prev, [resolvedFeedId]: list }));
                           }}
                           onAddComment={async (body) => {
@@ -612,6 +644,14 @@ export default function SocialClient() {
                                 ...prev,
                                 [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), comment],
                               }));
+                              const { comments: fresh, error: loadError } =
+                                await getCommentsForPost(resolvedFeedId);
+                              if (!loadError) {
+                                setComments((prev) => ({
+                                  ...prev,
+                                  [resolvedFeedId]: fresh,
+                                }));
+                              }
                               return { ok: true };
                             }
                             const devSuffix =
