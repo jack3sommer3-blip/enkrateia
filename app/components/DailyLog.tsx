@@ -303,13 +303,14 @@ export default function DailyLog({
   }, [userId, dateKey]);
 
   useEffect(() => {
+    if (!hydrated) return;
     latestRef.current = {
       data,
       goals,
       drinking: drinkingEvents,
       dateKey,
     };
-    if (hydrated) dirtyRef.current = true;
+    dirtyRef.current = true;
   }, [data, goals, drinkingEvents, dateKey, hydrated]);
 
   useEffect(() => {
