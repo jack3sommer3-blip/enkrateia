@@ -1,0 +1,285 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import StoryLoading from "@/app/components/StoryLoading";
+import ActivityPost from "@/app/components/social/ActivityPost";
+import {
+  addComment,
+  deleteComment,
+  getCommentsForPost,
+  getLikesForFeed,
+  getUserFeed,
+  toggleLike,
+  ensureFeedItemIdForActivity,
+  getProfileByUsername,
+  getCommentCounts,
+} from "@/lib/social";
+import type { ActivityItem, Comment, Like, Profile } from "@/lib/types";
+
+type ProfileViewProps = {
+  username?: string;
+  viewerId?: string;
+};
+
+export default function ProfileView({ username, viewerId }: ProfileViewProps) {
+  const [profile, setProfile] = useState<Profile | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [likes, setLikes] = useState<Record<string, Like[]>>({});
+  const [liked, setLiked] = useState<Record<string, boolean>>({});
+  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const debugEnabled = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("debug") === "1"
+    : false;
+  const loadingRef = useRef(false);
+
+  useEffect(() => {
+    if (!username) return;
+    setLoading(true);
+    getProfileByUsername(username).then((data) => {
+      setProfile(data);
+      setLoading(false);
+    });
+  }, [username]);
+
+  useEffect(() => {
+    if (!profile?.id || loadingRef.current) return;
+    let active = true;
+    loadingRef.current = true;
+    const load = async () => {
+      const feedItems = await getUserFeed(profile.id);
+      if (!active) return;
+      const mapped: ActivityItem[] = feedItems.map((item) => ({
+        id: item.id,
+        user_id: item.user_id,
+        event_type: item.event_type,
+        event_id: item.event_id,
+        event_date: item.event_date,
+        created_at: item.created_at,
+        summary: item.summary,
+        metadata: item.metadata ?? {},
+        feed_item_id: item.id,
+      }));
+      setItems(mapped);
+
+      const feedIds = mapped.map((item) => item.feed_item_id).filter(Boolean) as string[];
+      const likesList = await getLikesForFeed(feedIds);
+      if (!active) return;
+      const grouped: Record<string, Like[]> = {};
+      likesList.forEach((like) => {
+        grouped[like.feed_item_id] = [...(grouped[like.feed_item_id] ?? []), like];
+      });
+      setLikes(grouped);
+      if (viewerId) {
+        const likedMap: Record<string, boolean> = {};
+        likesList.forEach((like) => {
+          if (like.user_id === viewerId) likedMap[like.feed_item_id] = true;
+        });
+        setLiked(likedMap);
+      }
+      const counts = await getCommentCounts(feedIds);
+      if (active) setCommentCounts(counts);
+    };
+    load();
+    return () => {
+      active = false;
+      loadingRef.current = false;
+    };
+  }, [profile?.id, viewerId]);
+
+  const displayName = useMemo(() => {
+    if (!profile) return "";
+    return profile.display_name || `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim();
+  }, [profile]);
+
+  if (loading) return <StoryLoading />;
+  if (!profile) {
+    return (
+      <div className="text-gray-400">Profile not found.</div>
+    );
+  }
+
+  return (
+    <section className="mt-6">
+      <div className="command-surface rounded-md p-6">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-full border border-white/10 bg-slate-800 overflow-hidden flex items-center justify-center">
+              {profile.profile_photo_url ? (
+                <img
+                  src={profile.profile_photo_url}
+                  alt={displayName || "Profile"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-xs text-gray-400">ME</span>
+              )}
+            </div>
+            <div>
+              <div className="text-2xl font-semibold text-white">
+                {displayName || "Profile"}
+              </div>
+              <div className="text-gray-400 mt-1">@{profile.username ?? ""}</div>
+            </div>
+          </div>
+          {viewerId && viewerId === profile.id ? (
+            <Link
+              href="/settings"
+              className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20"
+            >
+              Edit profile
+            </Link>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="command-surface rounded-md p-6">
+          <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
+            Activity
+          </div>
+          <div className="mt-4 space-y-3">
+            {items.length === 0 ? (
+              <div className="text-gray-500">No activity yet.</div>
+            ) : (
+              items.map((item) => {
+                const feedId = item.feed_item_id;
+                const commentCount = feedId
+                  ? commentCounts[feedId] ?? comments[feedId]?.length ?? 0
+                  : 0;
+                return (
+                  <ActivityPost
+                    key={`${item.user_id}-${item.event_type}-${item.event_id}`}
+                    item={item}
+                    displayName={displayName || "User"}
+                    username={profile.username ?? "user"}
+                    photoUrl={profile.profile_photo_url}
+                    liked={feedId ? !!liked[feedId] : false}
+                    likeCount={feedId ? likes[feedId]?.length ?? 0 : 0}
+                    commentCount={commentCount}
+                    comments={feedId ? comments[feedId] : []}
+                    currentUserId={viewerId ?? ""}
+                    onToggleLike={async () => {
+                      if (!feedId || !viewerId) return;
+                      const res = await toggleLike(feedId, !!liked[feedId], viewerId);
+                      if (res || res === false) {
+                        setLiked((prev) => ({ ...prev, [feedId]: !prev[feedId] }));
+                        setLikes((prev) => {
+                          const current = prev[feedId] ?? [];
+                          if (liked[feedId]) {
+                            return {
+                              ...prev,
+                              [feedId]: current.filter((like) => like.user_id !== viewerId),
+                            };
+                          }
+                          return {
+                            ...prev,
+                            [feedId]: [...current, { user_id: viewerId, feed_item_id: feedId }],
+                          };
+                        });
+                      }
+                    }}
+                    onLoadComments={async () => {
+                      let resolvedFeedId = feedId;
+                      if (!resolvedFeedId) {
+                        resolvedFeedId = await ensureFeedItemIdForActivity(item);
+                        if (resolvedFeedId) {
+                          setItems((prev) =>
+                            prev.map((it) =>
+                              it.event_id === item.event_id &&
+                              it.event_type === item.event_type &&
+                              it.user_id === item.user_id
+                                ? { ...it, feed_item_id: resolvedFeedId }
+                                : it
+                            )
+                          );
+                        }
+                      }
+                      if (!resolvedFeedId) return;
+                      const { comments: list, error } =
+                        await getCommentsForPost(resolvedFeedId);
+                      if (error) return;
+                      setComments((prev) => ({ ...prev, [resolvedFeedId]: list }));
+                    }}
+                    onAddComment={async (body) => {
+                      if (!viewerId) return { ok: false, error: "Sign in to comment." };
+                      let resolvedFeedId = feedId;
+                      if (!resolvedFeedId) {
+                        resolvedFeedId = await ensureFeedItemIdForActivity(item);
+                        if (resolvedFeedId) {
+                          setItems((prev) =>
+                            prev.map((it) =>
+                              it.event_id === item.event_id &&
+                              it.event_type === item.event_type &&
+                              it.user_id === item.user_id
+                                ? { ...it, feed_item_id: resolvedFeedId }
+                                : it
+                            )
+                          );
+                        }
+                      }
+                      if (!resolvedFeedId) return { ok: false, error: "Post not ready." };
+                      const { comment, error } = await addComment(
+                        resolvedFeedId,
+                        body,
+                        viewerId
+                      );
+                      if (debugEnabled) {
+                        console.debug("[addComment] result", { comment, error });
+                      }
+                      if (comment) {
+                        setComments((prev) => ({
+                          ...prev,
+                          [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), comment],
+                        }));
+                        setCommentCounts((prev) => ({
+                          ...prev,
+                          [resolvedFeedId]: (prev[resolvedFeedId] ?? 0) + 1,
+                        }));
+                        const { comments: fresh, error: loadError } =
+                          await getCommentsForPost(resolvedFeedId);
+                        if (!loadError) {
+                          setComments((prev) => ({ ...prev, [resolvedFeedId]: fresh }));
+                        }
+                        return { ok: true };
+                      }
+                      return {
+                        ok: false,
+                        error: error?.message ?? "Failed to add comment",
+                      };
+                    }}
+                    onDeleteComment={async (comment) => {
+                      if (!feedId) return;
+                      const ok = await deleteComment(comment.id);
+                      if (ok) {
+                        setComments((prev) => ({
+                          ...prev,
+                          [feedId]: (prev[feedId] ?? []).filter((c) => c.id !== comment.id),
+                        }));
+                        setCommentCounts((prev) => ({
+                          ...prev,
+                          [feedId]: Math.max(0, (prev[feedId] ?? 1) - 1),
+                        }));
+                      }
+                    }}
+                    onDeletePost={async () => {
+                      // Profile view uses feed_items only; deletion handled elsewhere.
+                    }}
+                  />
+                );
+              })
+            )}
+          </div>
+        </div>
+        <div className="command-surface rounded-md p-6">
+          <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
+            Badges
+          </div>
+          <div className="mt-4 text-gray-500">Badges coming soon.</div>
+        </div>
+      </div>
+    </section>
+  );
+}

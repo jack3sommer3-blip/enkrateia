@@ -137,7 +137,7 @@ export default function ActivityPost({
     if (expanded) {
       onLoadComments();
     }
-  }, [expanded, onLoadComments]);
+  }, [expanded, item.feed_item_id]);
 
   return (
     <div className="relative rounded-md border border-white/10 bg-[#0b1220]/80 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_14px_28px_rgba(0,0,0,0.45)]">

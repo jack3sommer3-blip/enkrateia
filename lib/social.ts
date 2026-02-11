@@ -465,6 +465,21 @@ export async function getCommentsForPost(feedItemId: string) {
   return listComments(feedItemId);
 }
 
+export async function getCommentCounts(feedItemIds: string[]) {
+  if (feedItemIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("comments")
+    .select("feed_item_id, count:count()")
+    .in("feed_item_id", feedItemIds)
+    .group("feed_item_id");
+  if (error) return {};
+  const counts: Record<string, number> = {};
+  (data ?? []).forEach((row: any) => {
+    counts[row.feed_item_id] = Number(row.count ?? 0);
+  });
+  return counts;
+}
+
 export async function getLikesForFeed(feedItemIds: string[]) {
   if (feedItemIds.length === 0) return [];
   const { data, error } = await supabase
