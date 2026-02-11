@@ -40,6 +40,7 @@ export default function PublicProfilePage() {
   const [followers, setFollowers] = useState<any[]>([]);
   const [following, setFollowing] = useState<any[]>([]);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [commentErrors, setCommentErrors] = useState<Record<string, string>>({});
   const [likes, setLikes] = useState<Record<string, Like[]>>({});
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [commentBodies, setCommentBodies] = useState<Record<string, string>>({});
@@ -243,13 +244,23 @@ export default function PublicProfilePage() {
                   </button>
                     <button
                       onClick={async () => {
-                        const existing = comments[item.id];
-                        if (existing) return;
-                        const list = await listComments(item.id);
+                        const { comments: list, error } = await listComments(item.id);
+                        if (error) {
+                          setCommentErrors((prev) => ({
+                            ...prev,
+                            [item.id]: error.message ?? "Failed to load comments",
+                          }));
+                          return;
+                        }
+                        setCommentErrors((prev) => {
+                          const next = { ...prev };
+                          delete next[item.id];
+                          return next;
+                        });
                         setComments((prev) => ({ ...prev, [item.id]: list }));
                       }}
-                    className="hover:text-white"
-                  >
+                      className="hover:text-white"
+                    >
                     Comments • {comments[item.id]?.length ?? 0}
                   </button>
                 </div>
@@ -364,6 +375,11 @@ export default function PublicProfilePage() {
                       </div>
                     </div>
                   ) : null}
+                {commentErrors[item.id] ? (
+                  <div className="mt-2 text-xs text-rose-300">
+                    {commentErrors[item.id]}
+                  </div>
+                ) : null}
                 </div>
               ))
             )}
