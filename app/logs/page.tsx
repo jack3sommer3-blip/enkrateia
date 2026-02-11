@@ -9,7 +9,7 @@ import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/profile";
 import type { Profile } from "@/lib/types";
-import { addDays, startOfDay, toDateKey } from "@/lib/utils";
+import { addDays, startOfDay, toDateKey, todayKey } from "@/lib/utils";
 
 function buildCalendar(year: number, month: number) {
   const first = new Date(year, month, 1);
@@ -119,6 +119,7 @@ export default function LogsPage() {
   const target = new Date(base.getFullYear(), base.getMonth() + monthOffset, 1);
   const calendarDays = buildCalendar(target.getFullYear(), target.getMonth());
   const selectedRow = logMap.get(selectedDate);
+  const todayKeyValue = todayKey();
 
   const readiness = selectedRow?.total_score ?? 0;
   const delta = readiness - weeklyAverage;
@@ -183,16 +184,19 @@ export default function LogsPage() {
                 const row = logMap.get(key);
                 const isToday = key === toDateKey(new Date());
                 const isSelected = key === selectedDate;
+                const isFuture = key > todayKeyValue;
                 return (
                   <button
                     key={key}
                     type="button"
                     onClick={() => {
+                      if (isFuture) return;
                       setSelectedDate(key);
                       requestAnimationFrame(() => {
                         logRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                       });
                     }}
+                    disabled={isFuture}
                     className={[
                       "relative aspect-square rounded-md border transition text-left",
                       "bg-[#0b1220]/70",
@@ -200,6 +204,7 @@ export default function LogsPage() {
                       row ? "hover:border-[color:var(--accent-60)]" : "hover:border-white/20",
                       isToday ? "border-[color:var(--accent-60)]" : "",
                       isSelected ? "shadow-[0_0_16px_rgba(31,122,79,0.35)]" : "",
+                      isFuture ? "opacity-40 cursor-not-allowed hover:border-white/10" : "",
                     ].join(" ")}
                   >
                     <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:80px_80px] opacity-20" />
@@ -209,11 +214,8 @@ export default function LogsPage() {
                       </div>
                       {row ? (
                         <div className="h-full flex flex-col items-center justify-center pb-2">
-                          <div className="text-2xl font-semibold text-white">
+                          <div className="text-xl font-semibold text-white">
                             {row.total_score.toFixed(0)}
-                          </div>
-                          <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 opacity-70">
-                            /100
                           </div>
                         </div>
                       ) : null}

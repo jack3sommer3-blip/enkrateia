@@ -24,6 +24,7 @@ import {
   intFromText,
   numFromText,
   textFromUnknown,
+  todayKey,
 } from "@/lib/utils";
 
 const DEFAULT_DATA: DayData = {
@@ -73,6 +74,31 @@ function isValidReading(event: ReadingEvent) {
 
 function isValidDrinking(drinks: number) {
   return drinks > 0;
+}
+
+function hasMeaningfulData(data: DayData, drinkingEvents: DrinkingEvent[]) {
+  const steps = intFromText(data.workouts.stepsText) ?? 0;
+  if (steps > 0) return true;
+  if (data.workouts.activities.some(isValidWorkout)) return true;
+
+  const sleepHours = numFromText(data.sleep.hoursText) ?? 0;
+  const sleepMinutes = intFromText(data.sleep.minutesText) ?? 0;
+  const resting = intFromText(data.sleep.restingHrText) ?? 0;
+  if (sleepHours > 0 || sleepMinutes > 0 || resting > 0) return true;
+
+  const cooked = intFromText(data.diet.cookedMealsText) ?? 0;
+  const restaurant = intFromText(data.diet.restaurantMealsText) ?? 0;
+  const health = numFromText(data.diet.healthinessText) ?? 0;
+  const protein = intFromText(data.diet.proteinText) ?? 0;
+  if (cooked > 0 || restaurant > 0 || health > 0 || protein > 0) return true;
+
+  const readingEvents = data.reading.events ?? [];
+  if (readingEvents.some(isValidReading)) return true;
+  if (data.reading.title || (intFromText(data.reading.pagesText) ?? 0) > 0) return true;
+
+  if (drinkingEvents.some((event) => event.drinks > 0)) return true;
+
+  return false;
 }
 
 export default function DailyLog({
@@ -269,11 +295,25 @@ export default function DailyLog({
     });
   }, [readingOpen]);
 
+  const isFutureDate = dateKey > todayKey();
+
   useEffect(() => {
     if (!hydrated) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (isFutureDate) return;
 
     saveTimer.current = setTimeout(async () => {
+      const meaningful = hasMeaningfulData(data, drinkingEvents);
+      if (!meaningful) {
+        await supabase
+          .from("daily_logs")
+          .delete()
+          .eq("user_id", userId)
+          .eq("date", dateKey);
+        if (saveError) setSaveError(null);
+        return;
+      }
+
       const scores = computeScores(data, goals, drinkingEvents);
       const payload = {
         user_id: userId,
@@ -300,7 +340,7 @@ export default function DailyLog({
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [data, dateKey, hydrated, userId]);
+  }, [data, dateKey, hydrated, userId, drinkingEvents, goals, isFutureDate]);
 
   const totalWorkoutMinutes = useMemo(() => {
     return data.workouts.activities.reduce((sum, a) => {
@@ -400,6 +440,7 @@ export default function DailyLog({
         {...props}
         ref={ref}
         type={props.type ?? "text"}
+        disabled={isFutureDate || props.disabled}
         className={[
           "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
           "focus:outline-none focus:ring-2 focus:ring-white/10",
@@ -413,6 +454,7 @@ export default function DailyLog({
   const TextArea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
     <textarea
       {...props}
+      disabled={isFutureDate || props.disabled}
       className={[
         "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
         "focus:outline-none focus:ring-2 focus:ring-white/10",
@@ -424,6 +466,7 @@ export default function DailyLog({
   const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     <select
       {...props}
+      disabled={isFutureDate || props.disabled}
       className={[
         "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
         "focus:outline-none focus:ring-2 focus:ring-white/10",
@@ -464,6 +507,11 @@ export default function DailyLog({
                 Auto-save on
               </div>
             </div>
+            {isFutureDate ? (
+              <div className="mt-3 text-xs uppercase tracking-[0.3em] text-rose-300">
+                Future days locked
+              </div>
+            ) : null}
             <div className="min-h-[40px]">
               {saveError ? (
                 <div className="px-4 py-2 rounded-md bg-rose-950/40 border border-rose-800/60 text-rose-200 text-sm">
@@ -487,6 +535,7 @@ export default function DailyLog({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setExerciseOpen(true)}
+                disabled={isFutureDate}
                 className="px-4 py-2 rounded-md border border-white/10 bg-slate-900 hover:border-white/20 transition"
               >
                 Add workout
@@ -495,7 +544,7 @@ export default function DailyLog({
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label>Steps (optional)</Label>
+                <Label>Steps</Label>
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 8000"
@@ -561,7 +610,7 @@ export default function DailyLog({
                       />
                     </div>
                     <div>
-                      <Label>Calories (optional)</Label>
+                      <Label>Calories</Label>
                       <Input
                         inputMode="numeric"
                         placeholder="e.g., 320"
@@ -569,7 +618,7 @@ export default function DailyLog({
                       />
                     </div>
                     <div>
-                      <Label>Intensity 1–9 (optional)</Label>
+                      <Label>Intensity 1–9</Label>
                       <Input
                         inputMode="numeric"
                         placeholder="1–9"
@@ -725,7 +774,7 @@ export default function DailyLog({
               </div>
 
               <div>
-                <Label>Resting heart rate (optional)</Label>
+                <Label>Resting heart rate</Label>
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 52"
@@ -829,6 +878,7 @@ export default function DailyLog({
                 <div className="text-lg font-semibold">Drinking</div>
                 <button
                   onClick={() => setDrinkingOpen((prev) => !prev)}
+                  disabled={isFutureDate}
                   className="px-3 py-2 rounded-md border border-white/10 bg-slate-900 hover:border-white/20 transition text-sm"
                 >
                   {drinkingOpen ? "Close" : "Add drinking event"}
@@ -887,7 +937,7 @@ export default function DailyLog({
                         />
                       </div>
                       <div>
-                        <Label>Note (optional)</Label>
+                        <Label>Note</Label>
                         <Input placeholder="e.g., wedding" ref={drinkingNoteRef} />
                       </div>
                     <div className="md:col-span-3 flex items-center gap-3">
@@ -1033,6 +1083,7 @@ export default function DailyLog({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setReadingOpen(true)}
+                disabled={isFutureDate}
                 className="px-4 py-2 rounded-md border border-white/10 bg-slate-900 hover:border-white/20 transition"
               >
                 Add reading event
@@ -1082,11 +1133,11 @@ export default function DailyLog({
                       />
                     </div>
                     <div>
-                      <Label>Favorite quote (optional)</Label>
+                      <Label>Favorite quote</Label>
                       <Input placeholder="Paste a line that hit." ref={readingQuoteRef} />
                     </div>
                     <div className="md:col-span-2">
-                      <Label>Commentary (optional)</Label>
+                      <Label>Commentary</Label>
                       <textarea
                         rows={4}
                         placeholder="Quick thoughts, what you learned, what you’ll apply…"
