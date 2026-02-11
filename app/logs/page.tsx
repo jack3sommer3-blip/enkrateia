@@ -342,6 +342,7 @@ export default function LogsPage() {
           </div>
           <div className="mt-4">
             <DailyLog
+              key={selectedDate}
               dateKey={selectedDate}
               userId={userId}
               title={`Daily Log — ${selectedDate}`}

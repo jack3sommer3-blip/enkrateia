@@ -27,12 +27,27 @@ import {
   todayKey,
 } from "@/lib/utils";
 
-const DEFAULT_DATA: DayData = {
-  workouts: { activities: [] },
-  sleep: {},
-  diet: {},
-  reading: {},
-};
+function makeEmptyDailyLog(): DayData {
+  return {
+    workouts: { activities: [], stepsText: undefined },
+    sleep: { hoursText: undefined, minutesText: undefined, restingHrText: undefined },
+    diet: {
+      cookedMealsText: undefined,
+      restaurantMealsText: undefined,
+      healthinessText: undefined,
+      proteinText: undefined,
+    },
+    reading: {
+      events: [],
+      title: undefined,
+      pagesText: undefined,
+      fictionPagesText: undefined,
+      nonfictionPagesText: undefined,
+      note: undefined,
+      quote: undefined,
+    },
+  };
+}
 
 const DEBUG_DAILY_LOG = false;
 
@@ -248,13 +263,13 @@ export default function DailyLog({
     DEBUG_DAILY_LOG ||
     (typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).has("debug"));
-  const [data, setData] = useState<DayData>(DEFAULT_DATA);
+  const [data, setData] = useState<DayData>(() => makeEmptyDailyLog());
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
   const prevDateRef = useRef(dateKey);
-  // Root cause (Bug A): stale async loads could overwrite data after date changes.
+  // Root cause (Bug A): stale async loads + reused component state could leak data across dates.
   const activeDateRef = useRef(dateKey);
   const latestRef = useRef<{
     data: DayData;
@@ -287,7 +302,10 @@ export default function DailyLog({
     let mounted = true;
     activeDateRef.current = dateKey;
     setHydrated(false);
-    setData(DEFAULT_DATA);
+    setData(makeEmptyDailyLog());
+    setDrinkingEvents([]);
+    setDrinkingOpen(false);
+    setDrinkingEditId(null);
 
     const load = async () => {
       if (debugEnabled) {
@@ -367,7 +385,7 @@ export default function DailyLog({
           },
         });
       } else {
-        setData(DEFAULT_DATA);
+        setData(makeEmptyDailyLog());
       }
 
       setHydrated(true);
