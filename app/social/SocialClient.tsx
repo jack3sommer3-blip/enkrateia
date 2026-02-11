@@ -67,6 +67,7 @@ export default function SocialClient() {
   useEffect(() => {
     if (!userId) return;
     let active = true;
+    const debugEnabled = searchParams.get("debug") === "1";
     const load = async () => {
       const backfill = await backfillFeedItemsForUser(userId);
       const rows: any[] = await listFollowing(userId);
@@ -79,13 +80,49 @@ export default function SocialClient() {
 
       const { items, errors } = await getFeedActivityStream(userId, followingIds);
       if (!active) return;
-      setActivityItems(items);
+      let updatedItems = items;
+      const missingFeed = items.filter((item) => !item.feed_item_id);
+      if (missingFeed.length > 0) {
+        const concurrency = 6;
+        let index = 0;
+        const results: ActivityItem[] = [...items];
+        const runBatch = async () => {
+          while (index < missingFeed.length) {
+            const current = index;
+            index += 1;
+            const item = missingFeed[current];
+            const feedId = await ensureFeedItemIdForActivity(item);
+            if (feedId) {
+              const idx = results.findIndex(
+                (it) =>
+                  it.event_id === item.event_id &&
+                  it.event_type === item.event_type &&
+                  it.user_id === item.user_id
+              );
+              if (idx >= 0) results[idx] = { ...results[idx], feed_item_id: feedId };
+            }
+          }
+        };
+        await Promise.all(Array.from({ length: concurrency }, runBatch));
+        updatedItems = results;
+      }
+      if (debugEnabled) {
+        const ids = updatedItems.map((item) => item.feed_item_id).filter(Boolean);
+        console.debug("[feed] items", {
+          total: updatedItems.length,
+          withFeedId: ids.length,
+          ids,
+        });
+      }
+      setActivityItems(updatedItems);
       const combinedErrors = backfill.ok
         ? errors
         : [...errors, backfill.error ?? "Backfill failed"];
       setActivityErrors(combinedErrors);
 
-      const feedIds = items.map((item) => item.feed_item_id).filter(Boolean) as string[];
+      const feedIds = updatedItems
+        .map((item) => item.feed_item_id)
+        .filter(Boolean) as string[];
       const likesList = await getLikesForFeed(feedIds);
       if (!active) return;
       const grouped: Record<string, Like[]> = {};
@@ -99,6 +136,9 @@ export default function SocialClient() {
       });
       setLiked(likedMap);
       const counts = await getCommentCounts(feedIds);
+      if (debugEnabled) {
+        console.debug("[feed] comment counts keys", Object.keys(counts));
+      }
       if (active) setCommentCounts(counts);
     };
     load();
@@ -170,9 +210,7 @@ export default function SocialClient() {
                       }
                     : undefined);
                     const feedId = item.feed_item_id;
-                    const commentCount = feedId
-                      ? commentCounts[feedId] ?? comments[feedId]?.length ?? 0
-                      : 0;
+                    const commentCount = feedId ? commentCounts[feedId] ?? 0 : 0;
                     return (
                       <ActivityPost
                     key={`${item.user_id}-${item.event_type}-${item.event_id}`}
