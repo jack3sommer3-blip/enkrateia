@@ -467,11 +467,9 @@ export async function getCommentsForPost(feedItemId: string) {
 
 export async function getCommentCounts(feedItemIds: string[]) {
   if (feedItemIds.length === 0) return {};
-  const { data, error } = await supabase
-    .from("comments")
-    .select("feed_item_id, count:count()")
-    .in("feed_item_id", feedItemIds)
-    .group("feed_item_id");
+  const { data, error } = await supabase.rpc("get_comment_counts", {
+    feed_ids: feedItemIds,
+  });
   if (error) return {};
   const counts: Record<string, number> = {};
   (data ?? []).forEach((row: any) => {
