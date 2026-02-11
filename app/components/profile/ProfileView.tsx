@@ -42,6 +42,11 @@ export default function ProfileView({
     : false;
   const loadingRef = useRef(false);
 
+  const setAuthoritativeCount = (feedItemId: string, count: number) => {
+    setCommentCounts((prev) => ({ ...prev, [feedItemId]: count }));
+    onCommentCountChange?.(feedItemId, count);
+  };
+
   useEffect(() => {
     if (!username) return;
     setLoading(true);
@@ -88,12 +93,9 @@ export default function ProfileView({
       }
       const counts = await getCommentCounts(feedIds);
       if (active) {
-        setCommentCounts(counts);
-        if (onCommentCountChange) {
-          Object.entries(counts).forEach(([id, count]) =>
-            onCommentCountChange(id, count)
-          );
-        }
+        Object.entries(counts).forEach(([id, count]) =>
+          setAuthoritativeCount(id, count)
+        );
       }
     };
     load();
@@ -219,7 +221,7 @@ export default function ProfileView({
                         await getCommentsForPost(resolvedFeedId);
                       if (error) return;
                       setComments((prev) => ({ ...prev, [resolvedFeedId]: list }));
-                      onCommentCountChange?.(resolvedFeedId, list.length);
+                      setAuthoritativeCount(resolvedFeedId, list.length);
                     }}
                     onAddComment={async (body) => {
                       if (!viewerId) return { ok: false, error: "Sign in to comment." };
@@ -256,7 +258,7 @@ export default function ProfileView({
                           await getCommentsForPost(resolvedFeedId);
                         if (!loadError) {
                           setComments((prev) => ({ ...prev, [resolvedFeedId]: fresh }));
-                          onCommentCountChange?.(resolvedFeedId, fresh.length);
+                          setAuthoritativeCount(resolvedFeedId, fresh.length);
                         }
                         return { ok: true };
                       }
@@ -277,7 +279,7 @@ export default function ProfileView({
                           await getCommentsForPost(feedId);
                         if (!loadError) {
                           setComments((prev) => ({ ...prev, [feedId]: fresh }));
-                          onCommentCountChange?.(feedId, fresh.length);
+                          setAuthoritativeCount(feedId, fresh.length);
                         }
                       }
                     }}
