@@ -348,7 +348,7 @@ export default function DailyLog({
                 }
               : undefined;
         setData({
-          ...DEFAULT_DATA,
+          ...makeEmptyDailyLog(),
           ...parsed,
           workouts: {
             stepsText: legacySteps,
