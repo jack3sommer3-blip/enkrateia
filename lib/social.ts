@@ -9,8 +9,10 @@ import type {
   ReadingEvent,
   WorkoutActivity,
   ActivityItem,
+  DrinkingEvent,
 } from "@/lib/types";
 import { addDays, intFromText, toDateKey } from "@/lib/utils";
+import { computeScores } from "@/lib/scoring";
 
 export async function searchUsers(query: string) {
   if (!query.trim()) return [];
@@ -479,6 +481,47 @@ function activityFromReading(
   };
 }
 
+async function recomputeAndSaveDailyLog(
+  userId: string,
+  dateKey: string,
+  dataValue: DayData
+): Promise<{ ok: boolean; error?: string }> {
+  const { data: goalsRow, error: goalsError } = await supabase
+    .from("user_goals")
+    .select("goals")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (goalsError) return { ok: false, error: goalsError.message };
+
+  const { data: drinkingRows, error: drinkingError } = await supabase
+    .from("drinking_events")
+    .select("id, user_id, date, tier, drinks, note")
+    .eq("user_id", userId)
+    .eq("date", dateKey);
+  if (drinkingError) return { ok: false, error: drinkingError.message };
+
+  const drinkingEvents = (drinkingRows ?? []) as DrinkingEvent[];
+  const scores = computeScores(dataValue, goalsRow?.goals ?? null, drinkingEvents);
+  const steps = intFromText(dataValue.workouts?.stepsText);
+
+  const { error: saveError } = await supabase.from("daily_logs").upsert(
+    {
+      user_id: userId,
+      date: dateKey,
+      data: dataValue,
+      steps: steps ?? null,
+      total_score: scores.totalScore,
+      workout_score: scores.workoutScore,
+      sleep_score: scores.sleepScore,
+      diet_score: scores.dietScore,
+      reading_score: scores.readingScore,
+    },
+    { onConflict: "user_id,date" }
+  );
+  if (saveError) return { ok: false, error: saveError.message };
+  return { ok: true };
+}
+
 export async function getSelfActivityStream(
   userId: string,
   days = 30
@@ -504,6 +547,7 @@ export async function getSelfActivityStream(
 
     const activities = data?.workouts?.activities ?? [];
     activities.forEach((activity, index) => {
+      // Root cause (Bug 1): daily_logs.updated_at is shared; prefer per-event loggedAt when present.
       const activityCreatedAt = activity.loggedAt ?? fallbackCreatedAt;
       items.push(
         activityFromWorkout(userId, dateKey, activity, index, activityCreatedAt)
@@ -686,7 +730,7 @@ export async function deleteActivity(
   viewerId: string,
   item: ActivityItem
 ): Promise<{ ok: boolean; error?: string }> {
-  // Root cause (Bug 1): delete handlers were firing but wrong payload/table left the post intact.
+  // Root cause (Bug 2): deleting feed items without updating the daily log let posts reappear.
   // Keep a single path here and ensure the same mutation is used across surfaces.
   if (process.env.NODE_ENV !== "production") {
     // Temporary debug trace.
@@ -713,72 +757,68 @@ export async function deleteActivity(
 
     if (error) return { ok: false, error: error.message };
     if (!data?.data) {
-      if (process.env.NODE_ENV !== "production") {
-        console.debug("[deleteActivity] daily_logs row not found", {
-          userId: viewerId,
-          date: item.event_date,
-        });
-      }
-    } else {
-      const dataValue = (data?.data ?? {}) as DayData;
-      let changed = false;
+      return { ok: false, error: "Daily log not found for date" };
+    }
+    const dataValue = (data?.data ?? {}) as DayData;
+    let changed = false;
 
-      if (item.event_type === "workout") {
-        const activities = dataValue?.workouts?.activities ?? [];
-        const next = activities.filter((activity) => activity.id !== item.event_id);
-        changed = changed || next.length !== activities.length;
-        if (!changed && process.env.NODE_ENV !== "production") {
-          console.debug("[deleteActivity] workout id not found", {
-            eventId: item.event_id,
-            availableIds: activities.map((activity) => activity.id),
-          });
-        }
-        dataValue.workouts = {
-          ...dataValue.workouts,
-          activities: next,
-        };
+    if (item.event_type === "workout") {
+      const activities = dataValue?.workouts?.activities ?? [];
+      const next = activities.filter((activity) => activity.id !== item.event_id);
+      changed = next.length !== activities.length;
+      if (!changed) {
+        return { ok: false, error: "Workout event not found in daily log" };
       }
+      dataValue.workouts = {
+        ...dataValue.workouts,
+        activities: next,
+      };
+    }
 
-      if (item.event_type === "reading") {
-        const events = dataValue?.reading?.events ?? [];
-        const next = events.filter((event) => event.id !== item.event_id);
-        changed = changed || next.length !== events.length;
-        if (!changed && process.env.NODE_ENV !== "production") {
-          console.debug("[deleteActivity] reading id not found", {
-            eventId: item.event_id,
-            availableIds: events.map((event) => event.id),
-          });
-        }
+    if (item.event_type === "reading") {
+      const events = dataValue?.reading?.events ?? [];
+      const next = events.filter((event) => event.id !== item.event_id);
+      changed = next.length !== events.length;
+      const legacyId = stableUuid(`${item.event_date}-reading-legacy`);
+      if (!changed && item.event_id !== legacyId) {
+        return { ok: false, error: "Reading event not found in daily log" };
+      }
+      dataValue.reading = {
+        ...dataValue.reading,
+        events: next,
+      };
+      if (item.event_id === legacyId) {
         dataValue.reading = {
           ...dataValue.reading,
-          events: next,
+          title: undefined,
+          pagesText: undefined,
+          fictionPagesText: undefined,
+          nonfictionPagesText: undefined,
+          note: undefined,
+          quote: undefined,
         };
-        const legacyId = stableUuid(`${item.event_date}-reading-legacy`);
-        if (item.event_id === legacyId) {
-          changed = true;
-          dataValue.reading = {
-            ...dataValue.reading,
-            title: undefined,
-            pagesText: undefined,
-            fictionPagesText: undefined,
-            nonfictionPagesText: undefined,
-            note: undefined,
-            quote: undefined,
-          };
-        }
       }
+    }
 
-      if (changed) {
-        const { error: saveError } = await supabase.from("daily_logs").upsert(
-          {
-            user_id: viewerId,
-            date: item.event_date,
-            data: dataValue,
-          },
-          { onConflict: "user_id,date" }
-        );
-        if (saveError) return { ok: false, error: saveError.message };
-      }
+    const save = await recomputeAndSaveDailyLog(viewerId, item.event_date, dataValue);
+    if (!save.ok) return save;
+  }
+
+  if (item.event_type === "drinking") {
+    const { data: row, error: rowError } = await supabase
+      .from("daily_logs")
+      .select("data")
+      .eq("user_id", viewerId)
+      .eq("date", item.event_date)
+      .maybeSingle();
+    if (rowError) return { ok: false, error: rowError.message };
+    if (row?.data) {
+      const save = await recomputeAndSaveDailyLog(
+        viewerId,
+        item.event_date,
+        row.data as DayData
+      );
+      if (!save.ok) return save;
     }
   }
 

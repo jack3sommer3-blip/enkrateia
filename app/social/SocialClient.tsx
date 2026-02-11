@@ -235,15 +235,6 @@ export default function SocialClient() {
                       }
                     }}
                     onDeletePost={async () => {
-                      if (process.env.NODE_ENV !== "production") {
-                        console.debug("[Feed] delete click", {
-                          userId,
-                          eventType: item.event_type,
-                          eventId: item.event_id,
-                          eventDate: item.event_date,
-                          feedItemId: item.feed_item_id,
-                        });
-                      }
                       const res = await deleteActivity(userId, item);
                       if (res.ok) {
                         setActivityItems((prev) =>
@@ -493,16 +484,7 @@ export default function SocialClient() {
                               }));
                             }
                           }}
-                          onDeletePost={async () => {
-                            if (process.env.NODE_ENV !== "production") {
-                              console.debug("[Profile] delete click", {
-                                userId,
-                                eventType: item.event_type,
-                                eventId: item.event_id,
-                                eventDate: item.event_date,
-                                feedItemId: item.feed_item_id,
-                              });
-                            }
+                    onDeletePost={async () => {
                             const res = await deleteActivity(userId, item);
                             if (res.ok) {
                               setSelfItems((prev) =>
