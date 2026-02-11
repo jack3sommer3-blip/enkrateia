@@ -119,6 +119,7 @@ export default function DailyLog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
+  const prevDateRef = useRef(dateKey);
   const latestRef = useRef<{
     data: DayData;
     goals: ReturnType<typeof getDefaultGoals>;
@@ -229,6 +230,46 @@ export default function DailyLog({
       mounted = false;
     };
   }, [dateKey, userId]);
+
+  const flushSave = async (snapshot?: {
+    data: DayData;
+    goals: ReturnType<typeof getDefaultGoals>;
+    drinking: DrinkingEvent[];
+    dateKey: string;
+  }) => {
+    if (!snapshot) return;
+    if (snapshot.dateKey > todayKey()) return;
+    if (!hasMeaningfulData(snapshot.data, snapshot.drinking)) return;
+    const scores = computeScores(snapshot.data, snapshot.goals, snapshot.drinking);
+    const { error } = await supabase
+      .from("daily_logs")
+      .upsert(
+        {
+          user_id: userId,
+          date: snapshot.dateKey,
+          data: snapshot.data,
+          total_score: scores.totalScore,
+          workout_score: scores.workoutScore,
+          sleep_score: scores.sleepScore,
+          diet_score: scores.dietScore,
+          reading_score: scores.readingScore,
+        },
+        { onConflict: "user_id,date" }
+      );
+    if (error) {
+      setSaveError(error.message);
+    } else {
+      setSaveError(null);
+      dirtyRef.current = false;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("daily-log-saved", {
+            detail: { date: snapshot.dateKey, scores },
+          })
+        );
+      }
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -352,6 +393,13 @@ export default function DailyLog({
       } else {
         if (saveError) setSaveError(null);
         dirtyRef.current = false;
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("daily-log-saved", {
+              detail: { date: dateKey, scores },
+            })
+          );
+        }
       }
     }, 600);
 
@@ -361,34 +409,18 @@ export default function DailyLog({
   }, [data, dateKey, hydrated, userId, drinkingEvents, goals, isFutureDate]);
 
   useEffect(() => {
+    if (prevDateRef.current !== dateKey) {
+      flushSave(latestRef.current);
+      prevDateRef.current = dateKey;
+    }
+  }, [dateKey]);
+
+  useEffect(() => {
     return () => {
       if (!dirtyRef.current) return;
-      const snapshot = latestRef.current;
-      if (!snapshot) return;
-      if (snapshot.dateKey > todayKey()) return;
-      if (!hasMeaningfulData(snapshot.data, snapshot.drinking)) return;
-      const scores = computeScores(snapshot.data, snapshot.goals, snapshot.drinking);
-      supabase
-        .from("daily_logs")
-        .upsert(
-          {
-            user_id: userId,
-            date: snapshot.dateKey,
-            data: snapshot.data,
-            total_score: scores.totalScore,
-            workout_score: scores.workoutScore,
-            sleep_score: scores.sleepScore,
-            diet_score: scores.dietScore,
-            reading_score: scores.readingScore,
-          },
-          { onConflict: "user_id,date" }
-        )
-        .then(({ error }) => {
-          if (error) {
-            // Debug notes: focus loss + steps reset were caused by blur-only updates and delayed save.
-            console.error("Daily log flush save failed", error.message);
-          }
-        });
+      flushSave(latestRef.current).catch((error) => {
+        console.error("Daily log flush save failed", error?.message ?? error);
+      });
     };
   }, [userId]);
 
@@ -598,15 +630,8 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 8000"
-                  defaultValue={data.workouts.stepsText ?? ""}
+                  value={data.workouts.stepsText ?? ""}
                   onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      workouts: { ...prev.workouts, stepsText: value },
-                    }));
-                  }}
-                  onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,

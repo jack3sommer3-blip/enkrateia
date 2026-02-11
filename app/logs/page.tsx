@@ -102,6 +102,39 @@ export default function LogsPage() {
       });
   }, [monthOffset, userId]);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as {
+        date: string;
+        scores: {
+          totalScore: number;
+          workoutScore: number;
+          sleepScore: number;
+          dietScore: number;
+          readingScore: number;
+        };
+      };
+      if (!detail?.date) return;
+      setLogs((prev) => {
+        const exists = prev.find((row) => row.date === detail.date);
+        const updated: LogRow = {
+          date: detail.date,
+          total_score: detail.scores.totalScore,
+          workout_score: detail.scores.workoutScore,
+          sleep_score: detail.scores.sleepScore,
+          diet_score: detail.scores.dietScore,
+          reading_score: detail.scores.readingScore,
+        };
+        if (exists) {
+          return prev.map((row) => (row.date === detail.date ? updated : row));
+        }
+        return [...prev, updated];
+      });
+    };
+    window.addEventListener("daily-log-saved", handler as EventListener);
+    return () => window.removeEventListener("daily-log-saved", handler as EventListener);
+  }, []);
+
   const logMap = useMemo(() => {
     const map = new Map<string, LogRow>();
     logs.forEach((row) => map.set(row.date, row));
