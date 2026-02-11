@@ -118,6 +118,13 @@ export default function DailyLog({
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyRef = useRef(false);
+  const latestRef = useRef<{
+    data: DayData;
+    goals: ReturnType<typeof getDefaultGoals>;
+    drinking: DrinkingEvent[];
+    dateKey: string;
+  } | null>(null);
   const [goals, setGoals] = useState(getDefaultGoals());
   const [drinkingEvents, setDrinkingEvents] = useState<DrinkingEvent[]>([]);
   const [drinkingOpen, setDrinkingOpen] = useState(false);
@@ -255,6 +262,16 @@ export default function DailyLog({
   }, [userId, dateKey]);
 
   useEffect(() => {
+    latestRef.current = {
+      data,
+      goals,
+      drinking: drinkingEvents,
+      dateKey,
+    };
+    if (hydrated) dirtyRef.current = true;
+  }, [data, goals, drinkingEvents, dateKey, hydrated]);
+
+  useEffect(() => {
     if (!drinkingOpen) return;
     const event = drinkingEvents.find((item) => item.id === drinkingEditId);
     if (event) {
@@ -332,8 +349,9 @@ export default function DailyLog({
 
       if (error) {
         setSaveError(error.message);
-      } else if (saveError) {
-        setSaveError(null);
+      } else {
+        if (saveError) setSaveError(null);
+        dirtyRef.current = false;
       }
     }, 600);
 
@@ -341,6 +359,38 @@ export default function DailyLog({
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [data, dateKey, hydrated, userId, drinkingEvents, goals, isFutureDate]);
+
+  useEffect(() => {
+    return () => {
+      if (!dirtyRef.current) return;
+      const snapshot = latestRef.current;
+      if (!snapshot) return;
+      if (snapshot.dateKey > todayKey()) return;
+      if (!hasMeaningfulData(snapshot.data, snapshot.drinking)) return;
+      const scores = computeScores(snapshot.data, snapshot.goals, snapshot.drinking);
+      supabase
+        .from("daily_logs")
+        .upsert(
+          {
+            user_id: userId,
+            date: snapshot.dateKey,
+            data: snapshot.data,
+            total_score: scores.totalScore,
+            workout_score: scores.workoutScore,
+            sleep_score: scores.sleepScore,
+            diet_score: scores.dietScore,
+            reading_score: scores.readingScore,
+          },
+          { onConflict: "user_id,date" }
+        )
+        .then(({ error }) => {
+          if (error) {
+            // Debug notes: focus loss + steps reset were caused by blur-only updates and delayed save.
+            console.error("Daily log flush save failed", error.message);
+          }
+        });
+    };
+  }, [userId]);
 
   const totalWorkoutMinutes = useMemo(() => {
     return data.workouts.activities.reduce((sum, a) => {

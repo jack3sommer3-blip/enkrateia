@@ -256,6 +256,8 @@ export default function SocialClient() {
                               )
                           )
                         );
+                      } else {
+                        console.error("Delete activity failed", res.error);
                       }
                     }}
                   />
@@ -499,6 +501,8 @@ export default function SocialClient() {
                                     )
                                 )
                               );
+                            } else {
+                              console.error("Delete activity failed", res.error);
                             }
                           }}
                         />

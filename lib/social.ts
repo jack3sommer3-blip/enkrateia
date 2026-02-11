@@ -601,16 +601,24 @@ export async function getFeedActivityStream(
     .filter(isValidActivityItem);
 
   const feedMap = new Map<string, { id: string; created_at: string }>();
+  const feedSignature = new Map<string, { id: string; created_at: string }>();
   (feedItems ?? []).forEach((item: any) => {
     const key = `${item.user_id}:${item.event_type}:${item.event_id}`;
     feedMap.set(key, { id: item.id, created_at: item.created_at });
+    const signature = `${item.user_id}:${item.event_type}:${item.event_date}:${item.summary}`;
+    feedSignature.set(signature, { id: item.id, created_at: item.created_at });
   });
 
   const selfWithFeed = selfItems.map((item) => {
     const key = `${item.user_id}:${item.event_type}:${item.event_id}`;
     const feedInfo = feedMap.get(key);
-    return feedInfo
-      ? { ...item, feed_item_id: feedInfo.id, created_at: feedInfo.created_at }
+    if (feedInfo) {
+      return { ...item, feed_item_id: feedInfo.id, created_at: feedInfo.created_at };
+    }
+    const signature = `${item.user_id}:${item.event_type}:${item.event_date}:${item.summary}`;
+    const fallback = feedSignature.get(signature);
+    return fallback
+      ? { ...item, feed_item_id: fallback.id, created_at: fallback.created_at }
       : item;
   });
 
