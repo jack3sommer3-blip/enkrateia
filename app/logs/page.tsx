@@ -35,6 +35,9 @@ type LogRow = {
 export default function LogsPage() {
   const router = useRouter();
   const { loading, userId } = useSession();
+  const debugEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("debug");
   const [profile, setProfile] = useState<Profile | undefined>();
   const [profileLoading, setProfileLoading] = useState(true);
   const [logs, setLogs] = useState<LogRow[]>([]);
@@ -42,6 +45,11 @@ export default function LogsPage() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
   const logRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!debugEnabled) return;
+    console.debug("[Logs] selectedDate", { selectedDate, userId });
+  }, [debugEnabled, selectedDate, userId]);
 
   useEffect(() => {
     if (loading) return;
@@ -115,6 +123,9 @@ export default function LogsPage() {
         };
       };
       if (!detail?.date) return;
+      if (debugEnabled) {
+        console.debug("[Logs] daily-log-saved", { date: detail.date, scores: detail.scores });
+      }
       setLogs((prev) => {
         const exists = prev.find((row) => row.date === detail.date);
         const updated: LogRow = {
@@ -133,7 +144,7 @@ export default function LogsPage() {
     };
     window.addEventListener("daily-log-saved", handler as EventListener);
     return () => window.removeEventListener("daily-log-saved", handler as EventListener);
-  }, []);
+  }, [debugEnabled]);
 
   const logMap = useMemo(() => {
     const map = new Map<string, LogRow>();
@@ -238,6 +249,9 @@ export default function LogsPage() {
                     type="button"
                     onClick={() => {
                       if (isFuture) return;
+                      if (debugEnabled) {
+                        console.debug("[Logs] calendar click", { selectedDate: key, userId });
+                      }
                       setSelectedDate(key);
                       requestAnimationFrame(() => {
                         logRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });

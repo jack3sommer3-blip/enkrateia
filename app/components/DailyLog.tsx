@@ -91,6 +91,79 @@ const Select = ({ isFutureDate, ...props }: SelectProps) => (
   />
 );
 
+type CardProps = {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  earned: boolean;
+  hint?: string;
+  score: number;
+};
+
+// Root cause (Bug B): components defined inside render remounted inputs on every change.
+const Card = ({ title, subtitle, children, earned, hint, score }: CardProps) => (
+  <div
+    className={[
+      "p-6 rounded-md border transition command-surface",
+      earned ? "border-[color:var(--accent-40)] bg-[color:var(--accent-10)]" : "",
+    ].join(" ")}
+  >
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <div className="text-xl font-semibold">{title}</div>
+        <div className="text-gray-400 mt-1">{subtitle}</div>
+        {hint ? <div className="text-gray-500 mt-2 text-sm">{hint}</div> : null}
+      </div>
+      <div className="shrink-0">
+        <div
+          className={[
+            "px-3 py-2 rounded-md border text-xs uppercase tracking-[0.3em] text-gray-300",
+            earned
+              ? "border-[color:var(--accent-60)] text-[color:var(--accent)] bg-[color:var(--accent-10)]"
+              : "border-white/10 bg-black/40",
+          ].join(" ")}
+        >
+          {Math.round(score)}/25
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-5">{children}</div>
+  </div>
+);
+
+const Label = ({ children }: { children: React.ReactNode }) => (
+  <div className="text-gray-400 text-sm mb-1">{children}</div>
+);
+
+type StepsInputProps = {
+  value: string;
+  onChange: (value: string) => void;
+  isFutureDate: boolean;
+  debug: boolean;
+  dateKey: string;
+};
+
+const StepsInput = ({ value, onChange, isFutureDate, debug, dateKey }: StepsInputProps) => {
+  useEffect(() => {
+    if (!debug) return;
+    console.debug("[DailyLog] StepsInput mount", { dateKey });
+    return () => {
+      console.debug("[DailyLog] StepsInput unmount", { dateKey });
+    };
+  }, [debug, dateKey]);
+
+  return (
+    <Input
+      inputMode="numeric"
+      placeholder="e.g., 8000"
+      isFutureDate={isFutureDate}
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value)}
+    />
+  );
+};
+
 function id() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -171,12 +244,18 @@ export default function DailyLog({
   embedded?: boolean;
   showLabel?: boolean;
 }) {
+  const debugEnabled =
+    DEBUG_DAILY_LOG ||
+    (typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("debug"));
   const [data, setData] = useState<DayData>(DEFAULT_DATA);
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
   const prevDateRef = useRef(dateKey);
+  // Root cause (Bug A): stale async loads could overwrite data after date changes.
+  const activeDateRef = useRef(dateKey);
   const latestRef = useRef<{
     data: DayData;
     goals: ReturnType<typeof getDefaultGoals>;
@@ -206,28 +285,30 @@ export default function DailyLog({
 
   useEffect(() => {
     let mounted = true;
+    activeDateRef.current = dateKey;
     setHydrated(false);
+    setData(DEFAULT_DATA);
 
     const load = async () => {
-      if (DEBUG_DAILY_LOG) {
+      if (debugEnabled) {
         console.debug("[DailyLog] load start", { dateKey, userId });
       }
       const { data: row } = await supabase
         .from("daily_logs")
-        .select("data,steps")
+        .select("date,data,steps")
         .eq("user_id", userId)
         .eq("date", dateKey)
         .maybeSingle();
 
-      if (!mounted) return;
+      if (!mounted || activeDateRef.current !== dateKey) return;
 
       if (row?.data) {
         const parsed = row.data as DayData;
         // Root cause: stepsText was not hydrated from persisted data, so it reset to 0 on reopen.
         const legacySteps = textFromUnknown(
-          (parsed as DayData & { workouts?: { steps?: number } }).workouts?.steps ??
-            parsed?.workouts?.stepsText ??
-            row?.steps
+          row?.steps ??
+            (parsed as DayData & { workouts?: { steps?: number } }).workouts?.steps ??
+            parsed?.workouts?.stepsText
         );
         const legacySleep = textFromUnknown(
           (parsed as DayData & { sleep?: { hours?: number } }).sleep?.hours ??
@@ -290,8 +371,13 @@ export default function DailyLog({
       }
 
       setHydrated(true);
-      if (DEBUG_DAILY_LOG) {
-        console.debug("[DailyLog] load complete", { dateKey, userId });
+      if (debugEnabled) {
+        console.debug("[DailyLog] load complete", {
+          dateKey,
+          userId,
+          fetchedDate: row?.date ?? null,
+          hasRow: Boolean(row?.data),
+        });
       }
     };
 
@@ -302,12 +388,12 @@ export default function DailyLog({
   }, [dateKey, userId]);
 
   useEffect(() => {
-    if (!DEBUG_DAILY_LOG) return;
+    if (!debugEnabled) return;
     console.debug("[DailyLog] mount", { dateKey, userId });
     return () => {
       console.debug("[DailyLog] unmount", { dateKey, userId });
     };
-  }, [dateKey, userId]);
+  }, [dateKey, userId, debugEnabled]);
 
   const flushSave = async (snapshot?: {
     data: DayData;
@@ -320,7 +406,7 @@ export default function DailyLog({
     if (!hasMeaningfulData(snapshot.data, snapshot.drinking)) return;
     const scores = computeScores(snapshot.data, snapshot.goals, snapshot.drinking);
     const steps = intFromText(snapshot.data.workouts.stepsText);
-    if (DEBUG_DAILY_LOG) {
+    if (debugEnabled) {
       console.debug("[DailyLog] flush save", {
         dateKey: snapshot.dateKey,
         steps,
@@ -462,7 +548,7 @@ export default function DailyLog({
 
       const scores = computeScores(data, goals, drinkingEvents);
       const steps = intFromText(data.workouts.stepsText);
-      if (DEBUG_DAILY_LOG) {
+      if (debugEnabled) {
         console.debug("[DailyLog] autosave", {
           dateKey,
           steps,
@@ -563,55 +649,6 @@ export default function DailyLog({
     }));
   };
 
-  const Card = ({
-    title: cardTitle,
-    subtitle,
-    children,
-    earned,
-    hint,
-    score,
-  }: {
-    title: string;
-    subtitle: string;
-    children: React.ReactNode;
-    earned: boolean;
-    hint?: string;
-    score: number;
-  }) => (
-    <div
-      className={[
-        "p-6 rounded-md border transition command-surface",
-        earned ? "border-[color:var(--accent-40)] bg-[color:var(--accent-10)]" : "",
-      ].join(" ")}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-xl font-semibold">{cardTitle}</div>
-          <div className="text-gray-400 mt-1">{subtitle}</div>
-          {hint ? <div className="text-gray-500 mt-2 text-sm">{hint}</div> : null}
-        </div>
-        <div className="shrink-0">
-          <div
-            className={[
-              "px-3 py-2 rounded-md border text-xs uppercase tracking-[0.3em] text-gray-300",
-              earned
-                ? "border-[color:var(--accent-60)] text-[color:var(--accent)] bg-[color:var(--accent-10)]"
-                : "border-white/10 bg-black/40",
-            ].join(" ")}
-          >
-            {Math.round(score)}/25
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5">{children}</div>
-    </div>
-  );
-
-  const Label = ({ children }: { children: React.ReactNode }) => (
-    <div className="text-gray-400 text-sm mb-1">{children}</div>
-  );
-
   const content = (
     <div className="w-full max-w-4xl">
         <header className="mb-10">
@@ -682,18 +719,17 @@ export default function DailyLog({
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label>Steps</Label>
-                <Input
-                  inputMode="numeric"
-                  placeholder="e.g., 8000"
+                <StepsInput
+                  debug={debugEnabled}
+                  dateKey={dateKey}
                   isFutureDate={isFutureDate}
                   value={data.workouts.stepsText ?? ""}
-                  onChange={(e) => {
-                    const value = e.currentTarget.value;
+                  onChange={(value) =>
                     setData((prev) => ({
                       ...prev,
                       workouts: { ...prev.workouts, stepsText: value },
-                    }));
-                  }}
+                    }))
+                  }
                 />
               </div>
               <div className="md:col-span-2 text-gray-500 text-sm flex items-center">
