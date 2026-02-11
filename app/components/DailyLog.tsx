@@ -125,7 +125,7 @@ export default function DailyLog({
     goals: ReturnType<typeof getDefaultGoals>;
     drinking: DrinkingEvent[];
     dateKey: string;
-  } | null>(null);
+  } | undefined>(undefined);
   const [goals, setGoals] = useState(getDefaultGoals());
   const [drinkingEvents, setDrinkingEvents] = useState<DrinkingEvent[]>([]);
   const [drinkingOpen, setDrinkingOpen] = useState(false);
