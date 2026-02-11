@@ -1,14 +1,15 @@
-import { DayData, DayScore, Goals, DrinkingEvent, ReadingEvent } from "@/lib/types";
-import { computeCategoryScore, getDefaultGoals, normalizeGoals } from "@/lib/goals";
+import { DayData, DayScore, Goals, GoalConfig, DrinkingEvent, ReadingEvent } from "@/lib/types";
+import { computeCategoryScore, getDefaultGoals, normalizeGoalConfig } from "@/lib/goals";
 import { clampInt, intFromText, numFromText } from "@/lib/utils";
 
 export function computeScores(
   data: DayData,
-  goalsInput?: Goals | null,
+  goalsInput?: GoalConfig | Goals | null,
   drinkingEvents: DrinkingEvent[] = []
 ): DayScore {
   const defaultGoals = getDefaultGoals();
-  const goals = normalizeGoals(goalsInput);
+  const config = normalizeGoalConfig(goalsInput as GoalConfig | Goals | null);
+  const goals = config.categories;
   const totalWorkoutMinutes = data.workouts.activities.reduce((sum, a) => {
     const minutes = intFromText(a.minutesText) ?? 0;
     const seconds = clampInt(intFromText(a.secondsText) ?? 0, 0, 59);
@@ -99,12 +100,25 @@ export function computeScores(
   const dietScore = (dietScoreFinal100 / 100) * 25;
   const readingScore = readingRatio * 25;
 
+  const enabledCategories = config.enabledCategories;
+  const ratios: Record<string, number> = {
+    exercise: exerciseRatio,
+    sleep: sleepRatio,
+    diet: dietRatio,
+    reading: readingRatio,
+  };
+  const enabledRatios = enabledCategories.map((key) => ratios[key] ?? 0);
+  const overallRatio =
+    enabledRatios.length > 0
+      ? enabledRatios.reduce((sum, value) => sum + value, 0) / enabledRatios.length
+      : 0;
+
   return {
-    totalScore: workoutScore + sleepScore + dietScore + readingScore,
-    workoutScore,
-    sleepScore,
-    dietScore,
-    readingScore,
+    totalScore: overallRatio * 100,
+    workoutScore: enabledCategories.includes("exercise") ? workoutScore : 0,
+    sleepScore: enabledCategories.includes("sleep") ? sleepScore : 0,
+    dietScore: enabledCategories.includes("diet") ? dietScore : 0,
+    readingScore: enabledCategories.includes("reading") ? readingScore : 0,
     dietScoreBase100,
     dietScoreFinal100,
     dietPenaltyTotal: penalty.total,

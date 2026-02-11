@@ -6,6 +6,7 @@ import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/profile";
+import { getDefaultGoalConfig, getPresetConfig } from "@/lib/goals";
 import type { Profile } from "@/lib/types";
 import Cropper from "react-easy-crop";
 import { getCroppedImageBlob } from "@/lib/cropImage";
@@ -15,6 +16,7 @@ const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
 export default function SettingsPage() {
   const router = useRouter();
   const { loading, userId, email } = useSession();
+  const devMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
   const [profile, setProfile] = useState<Profile | undefined>();
   const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,10 +136,64 @@ export default function SettingsPage() {
             >
               Edit goals
             </a>
+            <button
+              onClick={() => router.push("/onboarding?preview=1")}
+              className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+            >
+              Preview onboarding
+            </button>
+            <button
+              onClick={async () => {
+                await supabase
+                  .from("user_goals")
+                  .upsert(
+                    {
+                      user_id: userId,
+                      goals: getDefaultGoalConfig().categories,
+                      enabled_categories: getDefaultGoalConfig().enabledCategories,
+                      onboarding_completed: false,
+                      updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: "user_id" }
+                  );
+                router.push("/onboarding");
+              }}
+              className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+            >
+              Reset onboarding
+            </button>
             <div className="text-sm text-gray-500">
               Goals control how daily scores are calculated.
             </div>
           </div>
+          {devMode ? (
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => router.push("/onboarding?force=1")}
+                className="px-4 py-2 rounded-md border border-amber-500/60 text-amber-300 hover:border-amber-400 transition"
+              >
+                Force onboarding
+              </button>
+              <button
+                onClick={async () => {
+                  const preset = getPresetConfig("75-hard");
+                  await supabase.from("user_goals").upsert(
+                    {
+                      user_id: userId,
+                      goals: preset.categories,
+                      enabled_categories: preset.enabledCategories,
+                      onboarding_completed: true,
+                      updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: "user_id" }
+                  );
+                }}
+                className="px-4 py-2 rounded-md border border-amber-500/60 text-amber-300 hover:border-amber-400 transition"
+              >
+                Seed preset (75 Hard)
+              </button>
+            </div>
+          ) : null}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <div className="text-gray-400 text-sm mb-1">Username</div>

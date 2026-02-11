@@ -25,8 +25,18 @@ create table if not exists daily_logs (
   unique (user_id, date)
 );
 
+create table if not exists user_goals (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  goals jsonb not null,
+  enabled_categories text[] not null default '{exercise,sleep,diet,reading}',
+  onboarding_completed boolean not null default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 alter table profiles enable row level security;
 alter table daily_logs enable row level security;
+alter table user_goals enable row level security;
 
 create policy "Profiles are readable by owner"
   on profiles for select
@@ -54,4 +64,16 @@ create policy "Daily logs are updatable by owner"
 
 create policy "Daily logs are deletable by owner"
   on daily_logs for delete
+  using (auth.uid() = user_id);
+
+create policy "User goals are readable by owner"
+  on user_goals for select
+  using (auth.uid() = user_id);
+
+create policy "User goals are insertable by owner"
+  on user_goals for insert
+  with check (auth.uid() = user_id);
+
+create policy "User goals are updatable by owner"
+  on user_goals for update
   using (auth.uid() = user_id);

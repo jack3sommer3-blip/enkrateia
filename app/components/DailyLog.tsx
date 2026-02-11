@@ -10,7 +10,7 @@ import {
   ReadingEvent,
 } from "@/lib/types";
 import { computeScores } from "@/lib/scoring";
-import { getDefaultGoals, normalizeGoals } from "@/lib/goals";
+import { getDefaultGoalConfig, normalizeGoalConfig } from "@/lib/goals";
 import {
   createDrinkingEvent,
   deleteDrinkingEvent,
@@ -273,11 +273,11 @@ export default function DailyLog({
   const activeDateRef = useRef(dateKey);
   const latestRef = useRef<{
     data: DayData;
-    goals: ReturnType<typeof getDefaultGoals>;
+    goals: ReturnType<typeof getDefaultGoalConfig>;
     drinking: DrinkingEvent[];
     dateKey: string;
   } | undefined>(undefined);
-  const [goals, setGoals] = useState(getDefaultGoals());
+  const [goals, setGoals] = useState(getDefaultGoalConfig());
   const [drinkingEvents, setDrinkingEvents] = useState<DrinkingEvent[]>([]);
   const [drinkingOpen, setDrinkingOpen] = useState(false);
   const [drinkingTier, setDrinkingTier] = useState<1 | 2 | 3>(2);
@@ -415,7 +415,7 @@ export default function DailyLog({
 
   const flushSave = async (snapshot?: {
     data: DayData;
-    goals: ReturnType<typeof getDefaultGoals>;
+    goals: ReturnType<typeof getDefaultGoalConfig>;
     drinking: DrinkingEvent[];
     dateKey: string;
   }) => {
@@ -466,15 +466,15 @@ export default function DailyLog({
     let mounted = true;
     supabase
       .from("user_goals")
-      .select("goals")
+      .select("goals, enabled_categories")
       .eq("user_id", userId)
       .maybeSingle()
       .then(({ data }) => {
         if (!mounted) return;
         if (data?.goals) {
-          setGoals(normalizeGoals(data.goals));
+          setGoals(normalizeGoalConfig(data.goals, data.enabled_categories));
         } else {
-          setGoals(getDefaultGoals());
+          setGoals(getDefaultGoalConfig());
         }
       });
     return () => {
@@ -651,11 +651,13 @@ export default function DailyLog({
   );
   const scores = computeScores(data, goals, drinkingEvents);
 
+  const enabledCategories = goals.enabledCategories ?? [];
   const completedCount =
-    (scores.workoutScore >= 25 ? 1 : 0) +
-    (scores.sleepScore >= 25 ? 1 : 0) +
-    (scores.dietScore >= 25 ? 1 : 0) +
-    (scores.readingScore >= 25 ? 1 : 0);
+    (enabledCategories.includes("exercise") && scores.workoutScore >= 25 ? 1 : 0) +
+    (enabledCategories.includes("sleep") && scores.sleepScore >= 25 ? 1 : 0) +
+    (enabledCategories.includes("diet") && scores.dietScore >= 25 ? 1 : 0) +
+    (enabledCategories.includes("reading") && scores.readingScore >= 25 ? 1 : 0);
+  const totalCategories = enabledCategories.length || 4;
 
   const removeActivity = (activityId: string) => {
     setData((prev) => ({
@@ -688,7 +690,7 @@ export default function DailyLog({
 
               <div className="px-4 py-2 rounded-md command-surface">
                 <span className="text-gray-400">Full points</span>{" "}
-                <span className="font-semibold">{completedCount}/4</span>
+                <span className="font-semibold">{completedCount}/{totalCategories}</span>
               </div>
 
               <div className="px-4 py-2 rounded-md command-surface text-gray-400">

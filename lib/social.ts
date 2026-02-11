@@ -560,7 +560,7 @@ async function recomputeAndSaveDailyLog(
 ): Promise<{ ok: boolean; error?: string }> {
   const { data: goalsRow, error: goalsError } = await supabase
     .from("user_goals")
-    .select("goals")
+    .select("goals, enabled_categories")
     .eq("user_id", userId)
     .maybeSingle();
   if (goalsError) return { ok: false, error: goalsError.message };
@@ -573,7 +573,16 @@ async function recomputeAndSaveDailyLog(
   if (drinkingError) return { ok: false, error: drinkingError.message };
 
   const drinkingEvents = (drinkingRows ?? []) as DrinkingEvent[];
-  const scores = computeScores(dataValue, goalsRow?.goals ?? null, drinkingEvents);
+  const scores = computeScores(
+    dataValue,
+    goalsRow
+      ? {
+          categories: goalsRow.goals,
+          enabledCategories: goalsRow.enabled_categories,
+        }
+      : null,
+    drinkingEvents
+  );
   const steps = intFromText(dataValue.workouts?.stepsText);
 
   const { error: saveError } = await supabase.from("daily_logs").upsert(

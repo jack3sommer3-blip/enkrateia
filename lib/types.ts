@@ -78,11 +78,19 @@ export type GoalCategory = {
   targets: Record<string, number>;
 };
 
+export type GoalCategoryKey = "exercise" | "sleep" | "diet" | "reading";
+
 export type Goals = {
   exercise: GoalCategory;
   sleep: GoalCategory;
   diet: GoalCategory;
   reading: GoalCategory;
+};
+
+export type GoalConfig = {
+  enabledCategories: GoalCategoryKey[];
+  categories: Goals;
+  presetId?: string;
 };
 
 export type DrinkingEvent = {

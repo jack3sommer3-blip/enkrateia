@@ -1,4 +1,11 @@
-import type { Goals } from "@/lib/types";
+import type { Goals, GoalConfig, GoalCategoryKey } from "@/lib/types";
+
+export const GOAL_CATEGORIES: GoalCategoryKey[] = [
+  "exercise",
+  "sleep",
+  "diet",
+  "reading",
+];
 
 const DEFAULT_GOALS: Goals = {
   exercise: {
@@ -43,6 +50,14 @@ export function getDefaultGoals(): Goals {
   return JSON.parse(JSON.stringify(DEFAULT_GOALS)) as Goals;
 }
 
+export function getDefaultGoalConfig(): GoalConfig {
+  return {
+    enabledCategories: [...GOAL_CATEGORIES],
+    categories: getDefaultGoals(),
+    presetId: "default",
+  };
+}
+
 export function normalizeGoals(input?: Partial<Goals> | null): Goals {
   const base = getDefaultGoals();
   if (!input) return base;
@@ -63,6 +78,118 @@ export function normalizeGoals(input?: Partial<Goals> | null): Goals {
 
   return base;
 }
+
+export function normalizeGoalConfig(
+  input?: Partial<GoalConfig> | Goals | null,
+  enabledCategoriesOverride?: string[] | null
+): GoalConfig {
+  const base = getDefaultGoalConfig();
+  if (!input) return base;
+
+  const maybeGoals =
+    (input as GoalConfig).categories ??
+    (input as any).goals ??
+    (input as Goals);
+
+  const categories = normalizeGoals(maybeGoals);
+  const enabledRaw =
+    (input as GoalConfig).enabledCategories ??
+    (input as any).enabled_categories ??
+    enabledCategoriesOverride ??
+    base.enabledCategories;
+
+  const enabledCategories = (Array.isArray(enabledRaw) ? enabledRaw : [])
+    .filter((key) => GOAL_CATEGORIES.includes(key as GoalCategoryKey)) as GoalCategoryKey[];
+
+  return {
+    enabledCategories: enabledCategories.length ? enabledCategories : base.enabledCategories,
+    categories,
+    presetId: (input as GoalConfig).presetId ?? (input as any).preset ?? base.presetId,
+  };
+}
+
+export type GoalPreset = {
+  id: string;
+  name: string;
+  description: string;
+  config: GoalConfig;
+  notes?: string[];
+};
+
+export const GOAL_PRESETS: GoalPreset[] = [
+  {
+    id: "default",
+    name: "Default",
+    description: "Balanced baseline across exercise, sleep, diet, and reading.",
+    config: getDefaultGoalConfig(),
+  },
+  {
+    id: "75-hard",
+    name: "75 Hard",
+    description: "Two workouts, strict diet, daily reading, and recovery targets.",
+    notes: [
+      "Outdoor workout, water intake, and progress photo are not tracked yet.",
+    ],
+    config: {
+      enabledCategories: ["exercise", "diet", "reading", "sleep"],
+      categories: {
+        ...getDefaultGoals(),
+        exercise: {
+          enabled: ["minutes", "workouts_logged", "steps"],
+          targets: { minutes: 90, workouts_logged: 2, steps: 10000 },
+        },
+        diet: {
+          enabled: ["meals_cooked_percent", "healthiness_self_rating"],
+          targets: { meals_cooked_percent: 100, healthiness_self_rating: 9 },
+        },
+        reading: {
+          enabled: ["pages"],
+          targets: { pages: 10 },
+        },
+        sleep: {
+          enabled: ["hours"],
+          targets: { hours: 8 },
+        },
+      },
+      presetId: "75-hard",
+    },
+  },
+];
+
+export function getPresetConfig(presetId: string): GoalConfig {
+  const preset = GOAL_PRESETS.find((p) => p.id === presetId);
+  return preset ? normalizeGoalConfig(preset.config) : getDefaultGoalConfig();
+}
+
+export type GoalOption = { key: string; label: string; hint: string };
+
+export const GOAL_OPTIONS: Record<GoalCategoryKey, GoalOption[]> = {
+  exercise: [
+    { key: "minutes", label: "Minutes", hint: "Total exercise minutes" },
+    { key: "calories_burned", label: "Calories", hint: "Calories burned" },
+    { key: "steps", label: "Steps", hint: "Daily steps" },
+    { key: "workouts_logged", label: "Workouts logged", hint: "Count of workouts" },
+  ],
+  sleep: [{ key: "hours", label: "Hours", hint: "Total sleep hours" }],
+  diet: [
+    {
+      key: "meals_cooked_percent",
+      label: "Cooked meals %",
+      hint: "Percent of meals cooked at home",
+    },
+    {
+      key: "healthiness_self_rating",
+      label: "Healthiness (1–10)",
+      hint: "Self rating",
+    },
+    { key: "protein_grams", label: "Protein grams", hint: "Daily protein" },
+  ],
+  reading: [
+    { key: "pages", label: "Pages", hint: "Total pages read" },
+    { key: "fiction_pages", label: "Fiction pages", hint: "Fiction only" },
+    { key: "nonfiction_pages", label: "Non-fiction pages", hint: "Non-fiction only" },
+  ],
+};
 
 export function computeCategoryScore(
   actuals: Record<string, number>,

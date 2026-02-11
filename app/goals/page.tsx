@@ -5,46 +5,24 @@ import { useRouter } from "next/navigation";
 import StoryLoading from "@/app/components/StoryLoading";
 import { useSession } from "@/app/components/useSession";
 import { supabase } from "@/lib/supabase";
-import { getDefaultGoals, normalizeGoals, GOAL_BOUNDS } from "@/lib/goals";
-import type { Goals } from "@/lib/types";
-
-type GoalOption = { key: string; label: string; hint: string };
-
-const GOAL_OPTIONS: Record<keyof Goals, GoalOption[]> = {
-  exercise: [
-    { key: "minutes", label: "Minutes", hint: "Total exercise minutes" },
-    { key: "calories_burned", label: "Calories", hint: "Calories burned" },
-    { key: "steps", label: "Steps", hint: "Daily steps" },
-    { key: "workouts_logged", label: "Workouts logged", hint: "Count of workouts" },
-  ],
-  sleep: [{ key: "hours", label: "Hours", hint: "Total sleep hours" }],
-  diet: [
-    {
-      key: "meals_cooked_percent",
-      label: "Cooked meals %",
-      hint: "Percent of meals cooked at home",
-    },
-    {
-      key: "healthiness_self_rating",
-      label: "Healthiness (1–10)",
-      hint: "Self rating",
-    },
-    { key: "protein_grams", label: "Protein grams", hint: "Daily protein" },
-  ],
-  reading: [
-    { key: "pages", label: "Pages", hint: "Total pages read" },
-    { key: "fiction_pages", label: "Fiction pages", hint: "Fiction only" },
-    { key: "nonfiction_pages", label: "Non-fiction pages", hint: "Non-fiction only" },
-  ],
-};
+import {
+  getDefaultGoalConfig,
+  normalizeGoalConfig,
+  GOAL_BOUNDS,
+  GOAL_OPTIONS,
+  GOAL_PRESETS,
+  getPresetConfig,
+} from "@/lib/goals";
+import type { GoalConfig, GoalCategoryKey } from "@/lib/types";
 
 export default function GoalsPage() {
   const router = useRouter();
   const { loading, userId } = useSession();
-  const [goals, setGoals] = useState<Goals>(getDefaultGoals());
+  const [goalConfig, setGoalConfig] = useState<GoalConfig>(getDefaultGoalConfig());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingGoals, setLoadingGoals] = useState(true);
+  const [selectedPreset, setSelectedPreset] = useState("default");
 
   useEffect(() => {
     if (loading) return;
@@ -55,55 +33,84 @@ export default function GoalsPage() {
     setLoadingGoals(true);
     supabase
       .from("user_goals")
-      .select("goals")
+      .select("goals, enabled_categories")
       .eq("user_id", userId)
       .maybeSingle()
       .then(({ data }) => {
-        setGoals(normalizeGoals(data?.goals));
+        const config = normalizeGoalConfig(data?.goals, data?.enabled_categories);
+        setGoalConfig(config);
+        setSelectedPreset(config.presetId ?? "default");
         setLoadingGoals(false);
       });
   }, [loading, router, userId]);
 
-  const updateTarget = (category: keyof Goals, key: string, value: string) => {
+  const updateTarget = (category: GoalCategoryKey, key: string, value: string) => {
     const n = Number(value);
-    setGoals((prev) => {
-      const targetValue = Number.isFinite(n) ? n : prev[category].targets[key];
+    setGoalConfig((prev) => {
+      const targetValue = Number.isFinite(n)
+        ? n
+        : prev.categories[category].targets[key];
       return {
         ...prev,
-        [category]: {
-          ...prev[category],
-          targets: {
-            ...prev[category].targets,
-            [key]: targetValue,
+        categories: {
+          ...prev.categories,
+          [category]: {
+            ...prev.categories[category],
+            targets: {
+              ...prev.categories[category].targets,
+              [key]: targetValue,
+            },
           },
         },
       };
     });
   };
 
-  const toggleVariable = (category: keyof Goals, key: string) => {
-    setGoals((prev) => {
-      const enabled = prev[category].enabled.includes(key)
-        ? prev[category].enabled.filter((k) => k !== key)
-        : [...prev[category].enabled, key];
+  const toggleVariable = (category: GoalCategoryKey, key: string) => {
+    setGoalConfig((prev) => {
+      const enabled = prev.categories[category].enabled.includes(key)
+        ? prev.categories[category].enabled.filter((k) => k !== key)
+        : [...prev.categories[category].enabled, key];
       return {
         ...prev,
-        [category]: {
-          ...prev[category],
-          enabled,
+        categories: {
+          ...prev.categories,
+          [category]: {
+            ...prev.categories[category],
+            enabled,
+          },
         },
       };
     });
   };
 
+  const toggleCategory = (category: GoalCategoryKey) => {
+    setGoalConfig((prev) => {
+      const enabled = prev.enabledCategories.includes(category)
+        ? prev.enabledCategories.filter((c) => c !== category)
+        : [...prev.enabledCategories, category];
+      return {
+        ...prev,
+        enabledCategories: enabled.length ? enabled : prev.enabledCategories,
+      };
+    });
+  };
+
+  const selectPreset = (presetId: string) => {
+    const config = getPresetConfig(presetId);
+    setGoalConfig(config);
+    setSelectedPreset(presetId);
+  };
+
   const resetDefaults = () => {
-    setGoals(getDefaultGoals());
+    setGoalConfig(getDefaultGoalConfig());
+    setSelectedPreset("default");
   };
 
   const validateGoals = () => {
-    for (const category of Object.keys(GOAL_OPTIONS) as (keyof Goals)[]) {
-      for (const key of goals[category].enabled) {
-        const value = goals[category].targets[key];
+    for (const category of goalConfig.enabledCategories) {
+      for (const key of goalConfig.categories[category].enabled) {
+        const value = goalConfig.categories[category].targets[key];
         if (!value || value <= 0) {
           return `Target for ${key.replaceAll("_", " ")} must be greater than 0.`;
         }
@@ -112,7 +119,10 @@ export default function GoalsPage() {
     return null;
   };
 
-  const normalizedGoals = useMemo(() => normalizeGoals(goals), [goals]);
+  const normalizedConfig = useMemo(
+    () => normalizeGoalConfig(goalConfig),
+    [goalConfig]
+  );
 
   const saveGoals = async () => {
     setError(null);
@@ -125,7 +135,8 @@ export default function GoalsPage() {
     const { error: saveError } = await supabase.from("user_goals").upsert(
       {
         user_id: userId,
-        goals: normalizedGoals,
+        goals: normalizedConfig.categories,
+        enabled_categories: normalizedConfig.enabledCategories,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
@@ -158,12 +169,54 @@ export default function GoalsPage() {
         </header>
 
         <section className="space-y-6">
-          {(Object.keys(GOAL_OPTIONS) as (keyof Goals)[]).map((category) => (
+          <div className="command-surface rounded-md p-6">
+            <div className="text-xl font-semibold">Presets</div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {GOAL_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => selectPreset(preset.id)}
+                  className={[
+                    "p-4 rounded-md border text-left transition",
+                    selectedPreset === preset.id
+                      ? "border-[color:var(--accent-60)] bg-[color:var(--accent-10)]"
+                      : "border-white/10 hover:border-white/20",
+                  ].join(" ")}
+                >
+                  <div className="text-white font-semibold">{preset.name}</div>
+                  <div className="text-gray-400 text-sm mt-1">{preset.description}</div>
+                  {preset.notes?.length ? (
+                    <ul className="mt-2 text-xs text-gray-500 list-disc ml-4">
+                      {preset.notes.map((note) => (
+                        <li key={note}>{note}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(Object.keys(GOAL_OPTIONS) as GoalCategoryKey[]).map((category) => (
             <div key={category} className="command-surface rounded-md p-6">
-              <div className="text-2xl font-semibold capitalize">{category}</div>
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-semibold capitalize">{category}</div>
+                <label className="flex items-center gap-2 text-sm text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={normalizedConfig.enabledCategories.includes(category)}
+                    onChange={() => toggleCategory(category)}
+                    className="w-4 h-4 rounded border border-gray-600 bg-black"
+                  />
+                  Enabled
+                </label>
+              </div>
               <div className="mt-4 space-y-4">
                 {GOAL_OPTIONS[category].map((option) => {
-                  const enabled = normalizedGoals[category].enabled.includes(option.key);
+                  const enabled =
+                    normalizedConfig.categories[category].enabled.includes(option.key);
+                  const categoryEnabled =
+                    normalizedConfig.enabledCategories.includes(category);
                   const bounds = GOAL_BOUNDS[option.key];
                   return (
                     <div
@@ -174,6 +227,7 @@ export default function GoalsPage() {
                         <input
                           type="checkbox"
                           checked={enabled}
+                          disabled={!categoryEnabled}
                           onChange={() => toggleVariable(category, option.key)}
                           className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-[color:var(--accent)] checked:border-[color:var(--accent-60)] transition"
                         />
@@ -184,10 +238,10 @@ export default function GoalsPage() {
                       </label>
                       <input
                         type="number"
-                        disabled={!enabled}
+                        disabled={!enabled || !categoryEnabled}
                         min={bounds?.min}
                         max={bounds?.max}
-                        value={normalizedGoals[category].targets[option.key] ?? ""}
+                        value={normalizedConfig.categories[category].targets[option.key] ?? ""}
                         onChange={(e) =>
                           updateTarget(category, option.key, e.target.value)
                         }

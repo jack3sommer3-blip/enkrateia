@@ -44,6 +44,20 @@ export default function DashboardPage() {
   }, [loading, router, userId]);
 
   useEffect(() => {
+    if (loading || !userId) return;
+    supabase
+      .from("user_goals")
+      .select("onboarding_completed")
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data?.onboarding_completed) {
+          router.replace("/onboarding");
+        }
+      });
+  }, [loading, router, userId]);
+
+  useEffect(() => {
     if (!userId) return;
     setLogsLoading(true);
     const today = startOfDay(new Date());
