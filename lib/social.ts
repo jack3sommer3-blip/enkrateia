@@ -407,13 +407,27 @@ export async function deleteComment(commentId: string) {
 }
 
 export async function listComments(feedItemId: string) {
+  const debugEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "1";
   const { data, error } = await supabase
     .from("comments")
     .select(
-      "id, author_id, feed_item_id, body, created_at, profiles:author_id(username, display_name, profile_photo_url)"
+      "id, author_id, feed_item_id, body, created_at, profiles!comments_author_id_fkey(username, display_name, profile_photo_url)"
     )
     .eq("feed_item_id", feedItemId)
     .order("created_at", { ascending: true });
+  if (error && process.env.NODE_ENV !== "production") {
+    console.debug("[listComments] error", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+  }
+  if (debugEnabled) {
+    console.debug("[listComments] sample row", data?.[0]);
+  }
   if (error) return [];
   return (data ?? []).map((row: any) => ({
     ...row,

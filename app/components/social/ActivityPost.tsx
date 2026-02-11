@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { ActivityItem, Comment, Like } from "@/lib/types";
 
 function formatTitle(item: ActivityItem) {
@@ -133,6 +133,12 @@ export default function ActivityPost({
     });
   }, [item.created_at]);
 
+  useEffect(() => {
+    if (expanded) {
+      onLoadComments();
+    }
+  }, [expanded, onLoadComments]);
+
   return (
     <div className="relative rounded-md border border-white/10 bg-[#0b1220]/80 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_14px_28px_rgba(0,0,0,0.45)]">
       <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:90px_90px] opacity-20" />
@@ -213,25 +219,32 @@ export default function ActivityPost({
               <div key={comment.id} className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <Link
-                      href={`/u/${comment.profiles?.username ?? ""}`}
-                      className="flex items-center gap-2 hover:text-white transition"
-                    >
-                      <span className="h-6 w-6 rounded-full border border-white/10 bg-slate-800 overflow-hidden">
-                        {comment.profiles?.profile_photo_url ? (
-                          <img
-                            src={comment.profiles.profile_photo_url}
-                            alt={comment.profiles?.username ?? "User"}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : null}
+                    {comment.profiles?.username ? (
+                      <Link
+                        href={`/u/${comment.profiles.username}`}
+                        className="flex items-center gap-2 hover:text-white transition"
+                      >
+                        <span className="h-6 w-6 rounded-full border border-white/10 bg-slate-800 overflow-hidden">
+                          {comment.profiles?.profile_photo_url ? (
+                            <img
+                              src={comment.profiles.profile_photo_url}
+                              alt={comment.profiles.username}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                        </span>
+                        <span>
+                          {comment.profiles?.display_name ??
+                            comment.profiles?.username ??
+                            "@unknown"}
+                        </span>
+                      </Link>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <span className="h-6 w-6 rounded-full border border-white/10 bg-slate-800" />
+                        <span>@unknown</span>
                       </span>
-                      <span>
-                        {comment.profiles?.display_name ??
-                          comment.profiles?.username ??
-                          "User"}
-                      </span>
-                    </Link>
+                    )}
                     <span className="text-gray-600">•</span>
                     <span>
                       {new Date(comment.created_at).toLocaleString("en-US", {

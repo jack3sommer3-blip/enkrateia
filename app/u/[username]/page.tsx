@@ -261,25 +261,32 @@ export default function PublicProfilePage() {
                           className="text-sm text-gray-300 flex items-center justify-between gap-3"
                         >
                           <div className="flex items-center gap-2">
-                            <Link
-                              href={`/u/${comment.profiles?.username ?? ""}`}
-                              className="flex items-center gap-2 hover:text-white transition"
-                            >
-                              <span className="h-6 w-6 rounded-full border border-white/10 bg-slate-800 overflow-hidden">
-                                {comment.profiles?.profile_photo_url ? (
-                                  <img
-                                    src={comment.profiles.profile_photo_url}
-                                    alt={comment.profiles?.username ?? "User"}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : null}
+                            {comment.profiles?.username ? (
+                              <Link
+                                href={`/u/${comment.profiles.username}`}
+                                className="flex items-center gap-2 hover:text-white transition"
+                              >
+                                <span className="h-6 w-6 rounded-full border border-white/10 bg-slate-800 overflow-hidden">
+                                  {comment.profiles?.profile_photo_url ? (
+                                    <img
+                                      src={comment.profiles.profile_photo_url}
+                                      alt={comment.profiles.username}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : null}
+                                </span>
+                                <span>
+                                  {comment.profiles?.display_name ??
+                                    comment.profiles?.username ??
+                                    "@unknown"}
+                                </span>
+                              </Link>
+                            ) : (
+                              <span className="flex items-center gap-2">
+                                <span className="h-6 w-6 rounded-full border border-white/10 bg-slate-800" />
+                                <span>@unknown</span>
                               </span>
-                              <span>
-                                {comment.profiles?.display_name ??
-                                  comment.profiles?.username ??
-                                  "User"}
-                              </span>
-                            </Link>
+                            )}
                             <span className="text-gray-600">•</span>
                             <span>
                               {new Date(comment.created_at).toLocaleString("en-US", {
