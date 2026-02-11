@@ -410,7 +410,7 @@ export default function DailyLog({
 
   useEffect(() => {
     if (prevDateRef.current !== dateKey) {
-      flushSave(latestRef.current);
+      flushSave(latestRef.current ?? undefined);
       prevDateRef.current = dateKey;
     }
   }, [dateKey]);
