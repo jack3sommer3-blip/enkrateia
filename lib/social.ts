@@ -397,8 +397,8 @@ export async function addComment(feedItemId: string, body: string, userId: strin
     .insert({ feed_item_id: feedItemId, body, user_id: userId })
     .select("id, user_id, feed_item_id, body, created_at")
     .single();
-  if (error) return undefined;
-  return data as Comment;
+  if (error) return { comment: undefined, error };
+  return { comment: data as Comment, error: null };
 }
 
 export async function deleteComment(commentId: string) {

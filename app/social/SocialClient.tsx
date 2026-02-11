@@ -249,15 +249,31 @@ export default function SocialClient() {
                         }
                         return { ok: false, error: "Post not ready for comments yet." };
                       }
-                      const created = await addComment(resolvedFeedId, body, userId);
-                      if (created) {
+                      const { comment, error } = await addComment(
+                        resolvedFeedId,
+                        body,
+                        userId
+                      );
+                      if (error && process.env.NODE_ENV !== "production") {
+                        console.debug("[addComment] error", {
+                          message: error.message,
+                          code: error.code,
+                          details: error.details,
+                          hint: error.hint,
+                        });
+                      }
+                      if (comment) {
                         setComments((prev) => ({
                           ...prev,
-                          [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), created],
+                          [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), comment],
                         }));
                         return { ok: true };
                       }
-                      return { ok: false, error: "Failed to add comment" };
+                      const devSuffix =
+                        error && process.env.NODE_ENV !== "production"
+                          ? `: ${error.message} (${error.code ?? "no_code"})`
+                          : "";
+                      return { ok: false, error: `Failed to add comment${devSuffix}` };
                     }}
                     onDeleteComment={async (comment) => {
                       if (!feedId) return;
@@ -533,15 +549,31 @@ export default function SocialClient() {
                               }
                               return { ok: false, error: "Post not ready for comments yet." };
                             }
-                            const created = await addComment(resolvedFeedId, body, userId);
-                            if (created) {
+                            const { comment, error } = await addComment(
+                              resolvedFeedId,
+                              body,
+                              userId
+                            );
+                            if (error && process.env.NODE_ENV !== "production") {
+                              console.debug("[addComment] error", {
+                                message: error.message,
+                                code: error.code,
+                                details: error.details,
+                                hint: error.hint,
+                              });
+                            }
+                            if (comment) {
                               setComments((prev) => ({
                                 ...prev,
-                                [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), created],
+                                [resolvedFeedId]: [...(prev[resolvedFeedId] ?? []), comment],
                               }));
                               return { ok: true };
                             }
-                            return { ok: false, error: "Failed to add comment" };
+                            const devSuffix =
+                              error && process.env.NODE_ENV !== "production"
+                                ? `: ${error.message} (${error.code ?? "no_code"})`
+                                : "";
+                            return { ok: false, error: `Failed to add comment${devSuffix}` };
                           }}
                           onDeleteComment={async (comment) => {
                             if (!feedId) return;

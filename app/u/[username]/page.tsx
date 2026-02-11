@@ -298,11 +298,23 @@ export default function PublicProfilePage() {
                             if (!userId) return;
                             const body = commentBodies[item.id]?.trim();
                             if (!body) return;
-                            const created = await addComment(item.id, body, userId);
-                            if (created) {
+                            const { comment, error } = await addComment(
+                              item.id,
+                              body,
+                              userId
+                            );
+                            if (error && process.env.NODE_ENV !== "production") {
+                              console.debug("[addComment] error", {
+                                message: error.message,
+                                code: error.code,
+                                details: error.details,
+                                hint: error.hint,
+                              });
+                            }
+                            if (comment) {
                               setComments((prev) => ({
                                 ...prev,
-                                [item.id]: [...(prev[item.id] ?? []), created],
+                                [item.id]: [...(prev[item.id] ?? []), comment],
                               }));
                               setCommentBodies((prev) => ({ ...prev, [item.id]: "" }));
                             }
