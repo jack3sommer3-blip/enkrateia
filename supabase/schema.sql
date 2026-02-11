@@ -14,6 +14,7 @@ create table if not exists daily_logs (
   user_id uuid not null references auth.users (id) on delete cascade,
   date date not null,
   data jsonb not null,
+  steps integer,
   total_score numeric not null,
   workout_score numeric not null,
   sleep_score numeric not null,

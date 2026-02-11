@@ -34,6 +34,63 @@ const DEFAULT_DATA: DayData = {
   reading: {},
 };
 
+const DEBUG_DAILY_LOG = false;
+
+type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
+  isFutureDate?: boolean;
+};
+
+const Input = forwardRef<HTMLInputElement, InputProps>(({ isFutureDate, ...props }, ref) => (
+  <input
+    {...props}
+    ref={ref}
+    type={props.type ?? "text"}
+    disabled={isFutureDate || props.disabled}
+    className={[
+      "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
+      "focus:outline-none focus:ring-2 focus:ring-white/10",
+      props.className ?? "",
+    ].join(" ")}
+  />
+));
+Input.displayName = "Input";
+
+type TextAreaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  isFutureDate?: boolean;
+};
+
+const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
+  ({ isFutureDate, ...props }, ref) => (
+    <textarea
+      {...props}
+      ref={ref}
+      disabled={isFutureDate || props.disabled}
+      className={[
+        "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
+        "focus:outline-none focus:ring-2 focus:ring-white/10",
+        props.className ?? "",
+      ].join(" ")}
+    />
+  )
+);
+TextArea.displayName = "TextArea";
+
+type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & {
+  isFutureDate?: boolean;
+};
+
+const Select = ({ isFutureDate, ...props }: SelectProps) => (
+  <select
+    {...props}
+    disabled={isFutureDate || props.disabled}
+    className={[
+      "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
+      "focus:outline-none focus:ring-2 focus:ring-white/10",
+      props.className ?? "",
+    ].join(" ")}
+  />
+);
+
 function id() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -152,9 +209,12 @@ export default function DailyLog({
     setHydrated(false);
 
     const load = async () => {
+      if (DEBUG_DAILY_LOG) {
+        console.debug("[DailyLog] load start", { dateKey, userId });
+      }
       const { data: row } = await supabase
         .from("daily_logs")
-        .select("data")
+        .select("data,steps")
         .eq("user_id", userId)
         .eq("date", dateKey)
         .maybeSingle();
@@ -163,6 +223,12 @@ export default function DailyLog({
 
       if (row?.data) {
         const parsed = row.data as DayData;
+        // Root cause: stepsText was not hydrated from persisted data, so it reset to 0 on reopen.
+        const legacySteps = textFromUnknown(
+          (parsed as DayData & { workouts?: { steps?: number } }).workouts?.steps ??
+            parsed?.workouts?.stepsText ??
+            row?.steps
+        );
         const legacySleep = textFromUnknown(
           (parsed as DayData & { sleep?: { hours?: number } }).sleep?.hours ??
             parsed?.sleep?.hoursText
@@ -186,6 +252,7 @@ export default function DailyLog({
           ...DEFAULT_DATA,
           ...parsed,
           workouts: {
+            stepsText: legacySteps,
             activities:
               parsed?.workouts?.activities?.map((activity) => ({
                 id: activity.id ?? id(),
@@ -223,11 +290,22 @@ export default function DailyLog({
       }
 
       setHydrated(true);
+      if (DEBUG_DAILY_LOG) {
+        console.debug("[DailyLog] load complete", { dateKey, userId });
+      }
     };
 
     load();
     return () => {
       mounted = false;
+    };
+  }, [dateKey, userId]);
+
+  useEffect(() => {
+    if (!DEBUG_DAILY_LOG) return;
+    console.debug("[DailyLog] mount", { dateKey, userId });
+    return () => {
+      console.debug("[DailyLog] unmount", { dateKey, userId });
     };
   }, [dateKey, userId]);
 
@@ -241,6 +319,14 @@ export default function DailyLog({
     if (snapshot.dateKey > todayKey()) return;
     if (!hasMeaningfulData(snapshot.data, snapshot.drinking)) return;
     const scores = computeScores(snapshot.data, snapshot.goals, snapshot.drinking);
+    const steps = intFromText(snapshot.data.workouts.stepsText);
+    if (DEBUG_DAILY_LOG) {
+      console.debug("[DailyLog] flush save", {
+        dateKey: snapshot.dateKey,
+        steps,
+        totalScore: scores.totalScore,
+      });
+    }
     const { error } = await supabase
       .from("daily_logs")
       .upsert(
@@ -248,6 +334,7 @@ export default function DailyLog({
           user_id: userId,
           date: snapshot.dateKey,
           data: snapshot.data,
+          steps: steps ?? null,
           total_score: scores.totalScore,
           workout_score: scores.workoutScore,
           sleep_score: scores.sleepScore,
@@ -374,10 +461,19 @@ export default function DailyLog({
       }
 
       const scores = computeScores(data, goals, drinkingEvents);
+      const steps = intFromText(data.workouts.stepsText);
+      if (DEBUG_DAILY_LOG) {
+        console.debug("[DailyLog] autosave", {
+          dateKey,
+          steps,
+          totalScore: scores.totalScore,
+        });
+      }
       const payload = {
         user_id: userId,
         date: dateKey,
         data,
+        steps: steps ?? null,
         total_score: scores.totalScore,
         workout_score: scores.workoutScore,
         sleep_score: scores.sleepScore,
@@ -450,7 +546,6 @@ export default function DailyLog({
     0
   );
   const scores = computeScores(data, goals, drinkingEvents);
-  const formKey = `${dateKey}-${hydrated ? "ready" : "loading"}`;
 
   const completedCount =
     (scores.workoutScore >= 25 ? 1 : 0) +
@@ -517,47 +612,6 @@ export default function DailyLog({
     <div className="text-gray-400 text-sm mb-1">{children}</div>
   );
 
-  const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-    (props, ref) => (
-      <input
-        {...props}
-        ref={ref}
-        type={props.type ?? "text"}
-        disabled={isFutureDate || props.disabled}
-        className={[
-          "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
-          "focus:outline-none focus:ring-2 focus:ring-white/10",
-          props.className ?? "",
-        ].join(" ")}
-      />
-    )
-  );
-  Input.displayName = "Input";
-
-  const TextArea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-    <textarea
-      {...props}
-      disabled={isFutureDate || props.disabled}
-      className={[
-        "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
-        "focus:outline-none focus:ring-2 focus:ring-white/10",
-        props.className ?? "",
-      ].join(" ")}
-    />
-  );
-
-  const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-    <select
-      {...props}
-      disabled={isFutureDate || props.disabled}
-      className={[
-        "w-full px-3 py-2 rounded-md bg-black/40 border border-white/10",
-        "focus:outline-none focus:ring-2 focus:ring-white/10",
-        props.className ?? "",
-      ].join(" ")}
-    />
-  );
-
   const content = (
     <div className="w-full max-w-4xl">
         <header className="mb-10">
@@ -605,7 +659,7 @@ export default function DailyLog({
           </div>
         </header>
 
-        <div key={formKey} className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           <Card
             title="Exercise"
             subtitle="Log activities; earn up to 25 points based on your goals."
@@ -631,6 +685,7 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 8000"
+                  isFutureDate={isFutureDate}
                   value={data.workouts.stepsText ?? ""}
                   onChange={(e) => {
                     const value = e.currentTarget.value;
@@ -662,6 +717,7 @@ export default function DailyLog({
                     <div>
                       <Label>Activity</Label>
                       <Select
+                        isFutureDate={isFutureDate}
                         value={exerciseType}
                         onChange={(e) =>
                           setExerciseType(e.target.value as ActivityType)
@@ -682,6 +738,7 @@ export default function DailyLog({
                         inputMode="numeric"
                         placeholder="e.g., 45"
                         ref={exerciseMinutesRef}
+                        isFutureDate={isFutureDate}
                       />
                     </div>
                     <div>
@@ -690,6 +747,7 @@ export default function DailyLog({
                         inputMode="numeric"
                         placeholder="e.g., 30"
                         ref={exerciseSecondsRef}
+                        isFutureDate={isFutureDate}
                       />
                     </div>
                     <div>
@@ -698,6 +756,7 @@ export default function DailyLog({
                         inputMode="numeric"
                         placeholder="e.g., 320"
                         ref={exerciseCaloriesRef}
+                        isFutureDate={isFutureDate}
                       />
                     </div>
                     <div>
@@ -706,6 +765,7 @@ export default function DailyLog({
                         inputMode="numeric"
                         placeholder="1–9"
                         ref={exerciseIntensityRef}
+                        isFutureDate={isFutureDate}
                       />
                     </div>
                   </div>
@@ -829,15 +889,9 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 7"
-                  defaultValue={data.sleep.hoursText ?? ""}
+                  isFutureDate={isFutureDate}
+                  value={data.sleep.hoursText ?? ""}
                   onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      sleep: { ...prev.sleep, hoursText: value },
-                    }));
-                  }}
-                  onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
@@ -852,15 +906,9 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 30"
-                  defaultValue={data.sleep.minutesText ?? ""}
+                  isFutureDate={isFutureDate}
+                  value={data.sleep.minutesText ?? ""}
                   onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      sleep: { ...prev.sleep, minutesText: value },
-                    }));
-                  }}
-                  onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
@@ -875,18 +923,9 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 52"
-                  defaultValue={data.sleep.restingHrText ?? ""}
+                  isFutureDate={isFutureDate}
+                  value={data.sleep.restingHrText ?? ""}
                   onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      sleep: {
-                        ...prev.sleep,
-                        restingHrText: value,
-                      },
-                    }));
-                  }}
-                  onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
@@ -916,15 +955,9 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 2"
-                  defaultValue={data.diet.cookedMealsText ?? ""}
+                  isFutureDate={isFutureDate}
+                  value={data.diet.cookedMealsText ?? ""}
                   onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      diet: { ...prev.diet, cookedMealsText: value },
-                    }));
-                  }}
-                  onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
@@ -939,18 +972,9 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 1"
-                  defaultValue={data.diet.restaurantMealsText ?? ""}
+                  isFutureDate={isFutureDate}
+                  value={data.diet.restaurantMealsText ?? ""}
                   onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      diet: {
-                        ...prev.diet,
-                        restaurantMealsText: value,
-                      },
-                    }));
-                  }}
-                  onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
@@ -970,15 +994,9 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 7"
-                  defaultValue={data.diet.healthinessText ?? ""}
+                  isFutureDate={isFutureDate}
+                  value={data.diet.healthinessText ?? ""}
                   onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      diet: { ...prev.diet, healthinessText: value },
-                    }));
-                  }}
-                  onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
@@ -992,15 +1010,9 @@ export default function DailyLog({
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 150"
-                  defaultValue={data.diet.proteinText ?? ""}
+                  isFutureDate={isFutureDate}
+                  value={data.diet.proteinText ?? ""}
                   onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setData((prev) => ({
-                      ...prev,
-                      diet: { ...prev.diet, proteinText: value },
-                    }));
-                  }}
-                  onBlur={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
@@ -1072,11 +1084,16 @@ export default function DailyLog({
                           placeholder="0–20"
                           defaultValue="0"
                           ref={drinkingDrinksRef}
+                          isFutureDate={isFutureDate}
                         />
                       </div>
                       <div>
                         <Label>Note</Label>
-                        <Input placeholder="e.g., wedding" ref={drinkingNoteRef} />
+                        <Input
+                          placeholder="e.g., wedding"
+                          ref={drinkingNoteRef}
+                          isFutureDate={isFutureDate}
+                        />
                       </div>
                     <div className="md:col-span-3 flex items-center gap-3">
                       <button
@@ -1244,7 +1261,11 @@ export default function DailyLog({
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label>Book title</Label>
-                      <Input placeholder="e.g., Meditations" ref={readingTitleRef} />
+                      <Input
+                        placeholder="e.g., Meditations"
+                        ref={readingTitleRef}
+                        isFutureDate={isFutureDate}
+                      />
                     </div>
                     <div>
                       <Label>Pages read</Label>
@@ -1252,6 +1273,7 @@ export default function DailyLog({
                         inputMode="numeric"
                         placeholder="e.g., 20"
                         ref={readingPagesRef}
+                        isFutureDate={isFutureDate}
                       />
                     </div>
                     <div>
@@ -1260,6 +1282,7 @@ export default function DailyLog({
                         inputMode="numeric"
                         placeholder="e.g., 10"
                         ref={readingFictionRef}
+                        isFutureDate={isFutureDate}
                       />
                     </div>
                     <div>
@@ -1268,19 +1291,24 @@ export default function DailyLog({
                         inputMode="numeric"
                         placeholder="e.g., 10"
                         ref={readingNonfictionRef}
+                        isFutureDate={isFutureDate}
                       />
                     </div>
                     <div>
                       <Label>Favorite quote</Label>
-                      <Input placeholder="Paste a line that hit." ref={readingQuoteRef} />
+                      <Input
+                        placeholder="Paste a line that hit."
+                        ref={readingQuoteRef}
+                        isFutureDate={isFutureDate}
+                      />
                     </div>
                     <div className="md:col-span-2">
                       <Label>Commentary</Label>
-                      <textarea
+                      <TextArea
+                        isFutureDate={isFutureDate}
                         rows={4}
                         placeholder="Quick thoughts, what you learned, what you’ll apply…"
                         ref={readingNoteRef}
-                        className="w-full px-3 py-2 rounded-md bg-black/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/10"
                       />
                     </div>
                   </div>
