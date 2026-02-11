@@ -14,6 +14,7 @@ export type WorkoutActivity = {
   secondsText?: string;
   caloriesText?: string;
   intensityText?: string; // 1–9
+  loggedAt?: string; // ISO timestamp
 };
 
 export type DayData = {
@@ -102,6 +103,7 @@ export type ReadingEvent = {
   nonfictionPages?: number;
   quote?: string;
   note?: string;
+  loggedAt?: string; // ISO timestamp
 };
 
 export type Follow = {

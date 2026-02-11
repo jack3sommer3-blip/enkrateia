@@ -500,17 +500,21 @@ export async function getSelfActivityStream(
   (logs ?? []).forEach((row: { date: string; data: DayData; updated_at?: string | null }) => {
     const data = row.data;
     const dateKey = row.date;
-    const createdAt = row.updated_at ?? undefined;
+    const fallbackCreatedAt = row.updated_at ?? undefined;
 
     const activities = data?.workouts?.activities ?? [];
     activities.forEach((activity, index) => {
-      items.push(activityFromWorkout(userId, dateKey, activity, index, createdAt));
+      const activityCreatedAt = activity.loggedAt ?? fallbackCreatedAt;
+      items.push(
+        activityFromWorkout(userId, dateKey, activity, index, activityCreatedAt)
+      );
     });
 
     const readingEvents = data?.reading?.events ?? [];
     if (readingEvents.length > 0) {
       readingEvents.forEach((event, index) => {
-        items.push(activityFromReading(userId, dateKey, event, index, createdAt));
+        const eventCreatedAt = event.loggedAt ?? fallbackCreatedAt;
+        items.push(activityFromReading(userId, dateKey, event, index, eventCreatedAt));
       });
     } else if (data?.reading?.title || data?.reading?.pagesText) {
       const pages = intFromText(data.reading.pagesText) ?? 0;
@@ -521,7 +525,7 @@ export async function getSelfActivityStream(
         event_type: "reading",
         event_id: eventId,
         event_date: dateKey,
-        created_at: createdAt ?? makeCreatedAt(dateKey),
+        created_at: fallbackCreatedAt ?? makeCreatedAt(dateKey),
         summary: readingSummary({
           id: eventId,
           title: data.reading.title,
@@ -723,6 +727,12 @@ export async function deleteActivity(
         const activities = dataValue?.workouts?.activities ?? [];
         const next = activities.filter((activity) => activity.id !== item.event_id);
         changed = changed || next.length !== activities.length;
+        if (!changed && process.env.NODE_ENV !== "production") {
+          console.debug("[deleteActivity] workout id not found", {
+            eventId: item.event_id,
+            availableIds: activities.map((activity) => activity.id),
+          });
+        }
         dataValue.workouts = {
           ...dataValue.workouts,
           activities: next,
@@ -733,6 +743,12 @@ export async function deleteActivity(
         const events = dataValue?.reading?.events ?? [];
         const next = events.filter((event) => event.id !== item.event_id);
         changed = changed || next.length !== events.length;
+        if (!changed && process.env.NODE_ENV !== "production") {
+          console.debug("[deleteActivity] reading id not found", {
+            eventId: item.event_id,
+            availableIds: events.map((event) => event.id),
+          });
+        }
         dataValue.reading = {
           ...dataValue.reading,
           events: next,

@@ -831,6 +831,7 @@ export default function DailyLog({
                         const calories = exerciseCaloriesRef.current?.value ?? "";
                         const intensity = exerciseIntensityRef.current?.value ?? "";
                         const workoutId = id();
+                        const loggedAt = new Date().toISOString();
                         const newWorkout: WorkoutActivity = {
                           id: workoutId,
                           type: exerciseType,
@@ -838,6 +839,7 @@ export default function DailyLog({
                           secondsText: seconds,
                           caloriesText: calories,
                           intensityText: intensity,
+                          loggedAt,
                         };
                         setData((prev) => ({
                           ...prev,
@@ -1379,6 +1381,7 @@ export default function DailyLog({
                         const note = readingNoteRef.current?.value ?? "";
 
                         const newEventId = id();
+                        const loggedAt = new Date().toISOString();
                         const newEvent: ReadingEvent = {
                           id: newEventId,
                           title: title.trim() || undefined,
@@ -1387,6 +1390,7 @@ export default function DailyLog({
                           nonfictionPages: nonfiction || undefined,
                           quote: quote.trim() || undefined,
                           note: note.trim() || undefined,
+                          loggedAt,
                         };
 
                         setData((prev) => ({
