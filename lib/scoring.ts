@@ -60,6 +60,7 @@ export function computeScores(
   const pagesRead = pagesReadRaw || eventPages || fictionPages + nonfictionPages;
   const healthiness = numFromText(data.diet.healthinessText) ?? 0;
   const protein = numFromText(data.diet.proteinText) ?? 0;
+  const waterOz = numFromText(data.diet.waterOzText) ?? 0;
   const communityCalls = numFromText(data.community?.callsText) ?? 0;
   const communityFriends = numFromText(data.community?.callsFriendsText) ?? 0;
   const communityFamily = numFromText(data.community?.callsFamilyText) ?? 0;
@@ -91,6 +92,7 @@ export function computeScores(
       meals_cooked_percent: dietCookedPercent,
       healthiness_self_rating: healthiness,
       protein_grams: protein,
+      water_oz: waterOz,
     },
     goals.diet,
     defaultGoals.diet

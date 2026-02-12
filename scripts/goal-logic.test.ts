@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { getWeekWindowFromKey } from "../lib/utils";
 import { clearEnabledVariablesForDomains, getDefaultGoalConfig, normalizeGoalConfig } from "../lib/goals";
+import type { GoalCategoryKey } from "../lib/types";
 
 function testWeekBoundaryMonday() {
   const sunday = getWeekWindowFromKey("2026-02-08");
@@ -22,7 +23,7 @@ function testCustomSetupClearsSelectedDomainsOnly() {
   const base = getDefaultGoalConfig();
   const withExtras = {
     ...base,
-    enabledCategories: ["exercise", "reading"],
+    enabledCategories: ["exercise", "reading"] as GoalCategoryKey[],
     categories: {
       ...base.categories,
       exercise: { enabled: ["minutes"], targets: { minutes: 60 } },

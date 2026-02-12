@@ -1,0 +1,126 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.computeScores = computeScores;
+const goals_1 = require("@/lib/goals");
+const utils_1 = require("@/lib/utils");
+function computeScores(data, goalsInput, drinkingEvents = [], weeklyActuals = {}) {
+    const defaultGoals = (0, goals_1.getDefaultGoals)();
+    const config = (0, goals_1.normalizeGoalConfig)(goalsInput);
+    const goals = config.categories;
+    const totalWorkoutMinutes = data.workouts.activities.reduce((sum, a) => {
+        const minutes = (0, utils_1.intFromText)(a.minutesText) ?? 0;
+        const seconds = (0, utils_1.clampInt)((0, utils_1.intFromText)(a.secondsText) ?? 0, 0, 59);
+        return sum + minutes + seconds / 60;
+    }, 0);
+    const totalWorkoutCalories = data.workouts.activities.reduce((sum, a) => sum + ((0, utils_1.numFromText)(a.caloriesText) ?? 0), 0);
+    const workoutsLogged = data.workouts.activities.length;
+    const steps = (0, utils_1.intFromText)(data.workouts.stepsText) ?? 0;
+    const sleepHours = (0, utils_1.numFromText)(data.sleep.hoursText) ?? 0;
+    const sleepMinutes = (0, utils_1.clampInt)((0, utils_1.intFromText)(data.sleep.minutesText) ?? 0, 0, 59);
+    const sleepTotalHours = sleepHours + sleepMinutes / 60;
+    const cookedMeals = (0, utils_1.intFromText)(data.diet.cookedMealsText) ?? 0;
+    const restaurantMeals = (0, utils_1.intFromText)(data.diet.restaurantMealsText) ?? 0;
+    const totalMeals = cookedMeals + restaurantMeals;
+    const readingEvents = (data.reading.events ?? []);
+    const pagesReadRaw = (0, utils_1.intFromText)(data.reading.pagesText) ?? 0;
+    const fictionPagesRaw = (0, utils_1.intFromText)(data.reading.fictionPagesText) ?? 0;
+    const nonfictionPagesRaw = (0, utils_1.intFromText)(data.reading.nonfictionPagesText) ?? 0;
+    const eventPages = readingEvents.reduce((sum, event) => sum + (event.pages ?? 0), 0);
+    const eventFictionPages = readingEvents.reduce((sum, event) => sum + (event.fictionPages ?? 0), 0);
+    const eventNonfictionPages = readingEvents.reduce((sum, event) => sum + (event.nonfictionPages ?? 0), 0);
+    const fictionPages = fictionPagesRaw || eventFictionPages;
+    const nonfictionPages = nonfictionPagesRaw || eventNonfictionPages;
+    const pagesRead = pagesReadRaw || eventPages || fictionPages + nonfictionPages;
+    const healthiness = (0, utils_1.numFromText)(data.diet.healthinessText) ?? 0;
+    const protein = (0, utils_1.numFromText)(data.diet.proteinText) ?? 0;
+    const waterOz = (0, utils_1.numFromText)(data.diet.waterOzText) ?? 0;
+    const communityCalls = (0, utils_1.numFromText)(data.community?.callsText) ?? 0;
+    const communityFriends = (0, utils_1.numFromText)(data.community?.callsFriendsText) ?? 0;
+    const communityFamily = (0, utils_1.numFromText)(data.community?.callsFamilyText) ?? 0;
+    const communitySocialEvents = (0, utils_1.numFromText)(data.community?.socialEventsText) ?? 0;
+    const dietCookedPercent = totalMeals > 0 ? (cookedMeals / totalMeals) * 100 : 0;
+    const exerciseRatio = (0, goals_1.computeCategoryScore)({
+        minutes: totalWorkoutMinutes,
+        calories_burned: totalWorkoutCalories,
+        steps,
+        workouts_logged: workoutsLogged,
+        workouts_logged_weekly: weeklyActuals.workouts_logged_weekly ?? 0,
+    }, goals.exercise, defaultGoals.exercise);
+    const sleepRatio = (0, goals_1.computeCategoryScore)({ hours: sleepTotalHours }, goals.sleep, defaultGoals.sleep);
+    const dietRatio = (0, goals_1.computeCategoryScore)({
+        meals_cooked_percent: dietCookedPercent,
+        healthiness_self_rating: healthiness,
+        protein_grams: protein,
+        water_oz: waterOz,
+    }, goals.diet, defaultGoals.diet);
+    const readingRatio = (0, goals_1.computeCategoryScore)({
+        pages: pagesRead,
+        pages_weekly: weeklyActuals.pages_weekly ?? 0,
+        fiction_pages: fictionPages,
+        nonfiction_pages: nonfictionPages,
+    }, goals.reading, defaultGoals.reading);
+    const communityRatio = (0, goals_1.computeCategoryScore)({
+        calls_friends_weekly: weeklyActuals.calls_friends_weekly ?? (communityFriends || communityCalls),
+        calls_family_weekly: weeklyActuals.calls_family_weekly ?? (communityFamily || 0),
+        social_events_weekly: weeklyActuals.social_events_weekly ?? communitySocialEvents,
+    }, goals.community, defaultGoals.community);
+    const workoutScore = exerciseRatio * 25;
+    const sleepScore = sleepRatio * 25;
+    const dietScoreBase100 = dietRatio * 100;
+    const penalty = calculateAlcoholPenalty(drinkingEvents);
+    const dietScoreFinal100 = Math.max(0, dietScoreBase100 - penalty.total);
+    const dietScore = (dietScoreFinal100 / 100) * 25;
+    const readingScore = readingRatio * 25;
+    const communityScore = communityRatio * 25;
+    const enabledCategories = config.enabledCategories;
+    const ratios = {
+        exercise: exerciseRatio,
+        sleep: sleepRatio,
+        diet: dietRatio,
+        reading: readingRatio,
+        community: communityRatio,
+    };
+    const enabledRatios = enabledCategories.map((key) => ratios[key] ?? 0);
+    const overallRatio = enabledRatios.length > 0
+        ? enabledRatios.reduce((sum, value) => sum + value, 0) / enabledRatios.length
+        : 0;
+    return {
+        totalScore: overallRatio * 100,
+        workoutScore: enabledCategories.includes("exercise") ? workoutScore : 0,
+        sleepScore: enabledCategories.includes("sleep") ? sleepScore : 0,
+        dietScore: enabledCategories.includes("diet") ? dietScore : 0,
+        readingScore: enabledCategories.includes("reading") ? readingScore : 0,
+        communityScore: enabledCategories.includes("community") ? communityScore : 0,
+        dietScoreBase100,
+        dietScoreFinal100,
+        dietPenaltyTotal: penalty.total,
+        dietPenaltyTier2: penalty.tier2,
+        dietPenaltyTier3: penalty.tier3,
+    };
+}
+function calculateAlcoholPenalty(events) {
+    let tier2Drinks = 0;
+    let tier3Drinks = 0;
+    events.forEach((event) => {
+        if (event.tier === 2)
+            tier2Drinks += event.drinks;
+        if (event.tier === 3)
+            tier3Drinks += event.drinks;
+    });
+    const tier2Over = Math.max(0, tier2Drinks - 3);
+    const tier2Penalty = tier2Over * 5;
+    let tier3Penalty = 0;
+    if (tier3Drinks <= 3) {
+        tier3Penalty = tier3Drinks * 3;
+    }
+    else {
+        tier3Penalty = 3 * 3 + (tier3Drinks - 3) * 7;
+    }
+    return {
+        total: tier2Penalty + tier3Penalty,
+        tier2: tier2Penalty,
+        tier3: tier3Penalty,
+        tier2Drinks,
+        tier3Drinks,
+    };
+}

@@ -37,6 +37,7 @@ function makeEmptyDailyLog(): DayData {
       restaurantMealsText: undefined,
       healthinessText: undefined,
       proteinText: undefined,
+      waterOzText: undefined,
     },
     reading: {
       events: [],
@@ -257,7 +258,9 @@ function hasMeaningfulData(data: DayData, drinkingEvents: DrinkingEvent[]) {
   const restaurant = intFromText(data.diet.restaurantMealsText) ?? 0;
   const health = numFromText(data.diet.healthinessText) ?? 0;
   const protein = intFromText(data.diet.proteinText) ?? 0;
-  if (cooked > 0 || restaurant > 0 || health > 0 || protein > 0) return true;
+  const water = intFromText(data.diet.waterOzText) ?? 0;
+  if (cooked > 0 || restaurant > 0 || health > 0 || protein > 0 || water > 0)
+    return true;
 
   const readingEvents = data.reading.events ?? [];
   if (readingEvents.some(isValidReading)) return true;
@@ -1255,6 +1258,25 @@ export default function DailyLog({
                     setData((prev) => ({
                       ...prev,
                       diet: { ...prev.diet, proteinText: value },
+                    }));
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Water (oz)</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 80"
+                  isFutureDate={isFutureDate}
+                  value={data.diet.waterOzText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      diet: { ...prev.diet, waterOzText: value },
                     }));
                   }}
                 />

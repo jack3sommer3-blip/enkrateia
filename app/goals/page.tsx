@@ -309,7 +309,11 @@ export default function GoalsPage() {
                               type="text"
                               inputMode="numeric"
                               disabled={!enabled || !categoryEnabled}
-                              value={getTargetInputValue(category, option.key)}
+                              value={
+                                enabled && categoryEnabled
+                                  ? getTargetInputValue(category, option.key)
+                                  : ""
+                              }
                               onChange={(e) =>
                                 setTargetEdits((prev) => ({
                                   ...prev,

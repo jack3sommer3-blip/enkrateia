@@ -53,6 +53,7 @@ export const GOAL_BOUNDS: Record<string, { min: number; max: number }> = {
   meals_cooked_percent: { min: 0, max: 100 },
   healthiness_self_rating: { min: 1, max: 10 },
   protein_grams: { min: 1, max: 400 },
+  water_oz: { min: 0, max: 300 },
   pages: { min: 1, max: 500 },
   fiction_pages: { min: 1, max: 500 },
   nonfiction_pages: { min: 1, max: 500 },
@@ -88,11 +89,27 @@ export function normalizeGoals(input?: Partial<Goals> | null): Goals {
     const incoming = input[category];
     if (!incoming) return;
     if (Array.isArray(incoming.enabled)) {
-      base[category].enabled = incoming.enabled.filter(Boolean);
+      const cleaned = incoming.enabled.filter(Boolean);
+      if (category === "community" && cleaned.includes("calls_weekly")) {
+        base[category].enabled = cleaned
+          .filter((key) => key !== "calls_weekly")
+          .concat("calls_friends_weekly");
+      } else {
+        base[category].enabled = cleaned;
+      }
     }
     if (incoming.targets && typeof incoming.targets === "object") {
       Object.entries(incoming.targets).forEach(([key, value]) => {
         if (typeof value !== "number" || !Number.isFinite(value)) return;
+        if (category === "community" && key === "calls_weekly") {
+          if (base[category].targets.calls_friends_weekly === undefined) {
+            base[category].targets.calls_friends_weekly = clampTarget(
+              "calls_friends_weekly",
+              value
+            );
+          }
+          return;
+        }
         base[category].targets[key] = clampTarget(key, value);
       });
     }
@@ -178,9 +195,7 @@ export const GOAL_PRESETS: GoalPreset[] = [
     id: "75-hard",
     name: "75 Hard",
     description: "Two workouts, strict diet, daily reading, and recovery targets.",
-    notes: [
-      "Water intake and progress photo are not tracked yet.",
-    ],
+    notes: [],
     config: {
       enabledCategories: ["exercise", "diet", "reading", "sleep"],
       categories: {
@@ -190,8 +205,8 @@ export const GOAL_PRESETS: GoalPreset[] = [
           targets: { minutes: 90, workouts_logged: 2, steps: 10000 },
         },
         diet: {
-          enabled: ["meals_cooked_percent", "healthiness_self_rating"],
-          targets: { meals_cooked_percent: 100, healthiness_self_rating: 9 },
+          enabled: ["meals_cooked_percent", "healthiness_self_rating", "water_oz"],
+          targets: { meals_cooked_percent: 100, healthiness_self_rating: 9, water_oz: 128 },
         },
         reading: {
           enabled: ["pages"],
@@ -347,6 +362,7 @@ export const GOAL_OPTIONS: Record<GoalCategoryKey, GoalOption[]> = {
       cadence: "daily",
     },
     { key: "protein_grams", label: "Protein grams", hint: "Daily protein", cadence: "daily" },
+    { key: "water_oz", label: "Water (oz)", hint: "Daily water intake", cadence: "daily" },
   ],
   reading: [
     { key: "pages", label: "Pages", hint: "Total pages read", cadence: "daily" },

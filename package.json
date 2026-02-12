@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:goals": "TZ=America/Chicago tsc --pretty false --noEmit false --module commonjs --moduleResolution node --baseUrl . --paths \"@/*\" \"./*\" --target es2020 --outDir .tmp-goal-tests scripts/goal-logic.test.ts && node .tmp-goal-tests/scripts/goal-logic.test.js"
+    "test:goals": "TZ=America/Chicago tsc --pretty false -p scripts/tsconfig.goals.json && node .tmp-goal-tests/scripts/goal-logic.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",

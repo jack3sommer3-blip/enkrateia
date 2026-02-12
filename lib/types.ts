@@ -33,6 +33,7 @@ export type DayData = {
     restaurantMealsText?: string;
     healthinessText?: string;
     proteinText?: string;
+    waterOzText?: string;
   };
   reading: {
     events?: ReadingEvent[];
