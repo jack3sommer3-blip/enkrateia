@@ -11,8 +11,10 @@ import {
   normalizeGoalConfig,
   GOAL_BOUNDS,
   GOAL_OPTIONS,
+  GOAL_CATEGORY_LABELS,
   GOAL_PRESETS,
   getPresetConfig,
+  clearEnabledVariablesForDomains,
 } from "@/lib/goals";
 import type { GoalCategoryKey, GoalConfig } from "@/lib/types";
 
@@ -24,7 +26,9 @@ export default function OnboardingClient() {
   const forceMode = searchParams.get("force") === "1";
 
   const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
-  const [step, setStep] = useState<"profile" | "goals">("profile");
+  const [step, setStep] = useState<
+    "profile" | "domains" | "path" | "goals" | "confirm"
+  >("profile");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
@@ -47,7 +51,7 @@ export default function OnboardingClient() {
         setFirstName(profile.first_name ?? "");
         setLastName(profile.last_name ?? "");
         setUsername(profile.username ?? "");
-        setStep("goals");
+        setStep("domains");
       }
 
       const { data: goalsRow } = await supabase
@@ -124,12 +128,54 @@ export default function OnboardingClient() {
   };
 
   const selectPreset = (presetId: string) => {
+    if (presetId === "custom") {
+      setSelectedPreset("custom");
+      setGoalConfig((prev) => ({
+        ...clearEnabledVariablesForDomains(prev, prev.enabledCategories),
+        presetId: "custom",
+      }));
+      return;
+    }
     const config = getPresetConfig(presetId);
-    setGoalConfig(config);
+    setGoalConfig((prev) => {
+      const enabledCategories = prev.enabledCategories;
+      const merged = { ...prev.categories };
+      enabledCategories.forEach((category) => {
+        merged[category] = config.categories[category];
+      });
+      return {
+        ...config,
+        enabledCategories,
+        categories: merged,
+        presetId: presetId,
+      };
+    });
     setSelectedPreset(presetId);
   };
 
   const normalizedConfig = useMemo(() => normalizeGoalConfig(goalConfig), [goalConfig]);
+
+  const stepTitle =
+    step === "profile"
+      ? "Create your profile"
+      : step === "domains"
+        ? "Select domains"
+        : step === "path"
+          ? "Choose your path"
+          : step === "goals"
+            ? "Set your targets"
+            : "Confirm your standard";
+
+  const stepSubtitle =
+    step === "profile"
+      ? "Your username will be public within the app."
+      : step === "domains"
+        ? "Define which domains count toward your score."
+        : step === "path"
+          ? "Structured paths pre-fill targets. You can still customize."
+          : step === "goals"
+            ? "Each enabled variable is weighted equally inside its category."
+            : "Review and define your standard.";
 
   const saveProfile = async () => {
     setError(null);
@@ -159,15 +205,21 @@ export default function OnboardingClient() {
       }
       return;
     }
-    setStep("goals");
+    setStep("domains");
   };
 
   const validateGoals = () => {
+    if (!normalizedConfig.enabledCategories.length) {
+      return "Select at least one domain to define your standard.";
+    }
     for (const category of normalizedConfig.enabledCategories) {
+      if (!normalizedConfig.categories[category].enabled.length) {
+        return `Select at least one variable in ${GOAL_CATEGORY_LABELS[category]}.`;
+      }
       for (const key of normalizedConfig.categories[category].enabled) {
         const value = normalizedConfig.categories[category].targets[key];
-        if (!value || value <= 0) {
-          return `Target for ${key.replaceAll("_", " ")} must be greater than 0.`;
+        if (value == null || Number.isNaN(value) || value < 0) {
+          return `Target for ${key.replaceAll("_", " ")} must be 0 or higher.`;
         }
       }
     }
@@ -214,14 +266,8 @@ export default function OnboardingClient() {
     <main className="min-h-screen text-white flex items-center justify-center p-8">
       <div className="w-full max-w-4xl">
         <div className="text-gray-500 text-sm tracking-[0.3em]">ENKRATEIA</div>
-        <h1 className="text-4xl font-semibold mt-4">
-          {step === "profile" ? "Create your profile" : "Configure goals"}
-        </h1>
-        <p className="text-gray-400 mt-2">
-          {step === "profile"
-            ? "Your username will be public within the app."
-            : "Choose what counts toward scoring. Each enabled variable is weighted equally in its category."}
-        </p>
+        <h1 className="text-4xl font-semibold mt-4">{stepTitle}</h1>
+        <p className="text-gray-400 mt-2">{stepSubtitle}</p>
 
         {step === "profile" ? (
           <div className="mt-6 space-y-4">
@@ -252,12 +298,62 @@ export default function OnboardingClient() {
               {saving ? "Saving…" : "Save profile"}
             </button>
           </div>
-        ) : (
+        ) : null}
+
+        {step === "domains" ? (
           <div className="mt-6 space-y-6">
             <div className="command-surface rounded-md p-6">
-              <div className="text-xl font-semibold">Presets</div>
+              <div className="text-xl font-semibold">Domains</div>
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {GOAL_PRESETS.map((preset) => (
+                {(Object.keys(GOAL_OPTIONS) as GoalCategoryKey[]).map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => toggleCategory(category)}
+                    className={[
+                      "p-4 rounded-md border text-left transition flex items-center justify-between",
+                      normalizedConfig.enabledCategories.includes(category)
+                        ? "border-[color:var(--accent-60)] bg-[color:var(--accent-10)]"
+                        : "border-white/10 hover:border-white/20",
+                    ].join(" ")}
+                  >
+                    <div className="text-white font-semibold">
+                      {GOAL_CATEGORY_LABELS[category]}
+                    </div>
+                    <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
+                      {normalizedConfig.enabledCategories.includes(category)
+                        ? "Enabled"
+                        : "Disabled"}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {error ? <div className="text-red-400 text-sm">{error}</div> : null}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setStep("path")}
+                className="px-4 py-3 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:border-[color:var(--accent)] transition"
+              >
+                Continue
+              </button>
+              {previewMode ? (
+                <button
+                  onClick={() => router.replace("/settings")}
+                  className="px-4 py-3 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+                >
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {step === "path" ? (
+          <div className="mt-6 space-y-6">
+            <div className="command-surface rounded-md p-6">
+              <div className="text-xl font-semibold">Structured paths</div>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {GOAL_PRESETS.filter((preset) => preset.id !== "default").map((preset) => (
                   <button
                     key={preset.id}
                     onClick={() => selectPreset(preset.id)}
@@ -279,13 +375,47 @@ export default function OnboardingClient() {
                     ) : null}
                   </button>
                 ))}
+                <button
+                  onClick={() => selectPreset("custom")}
+                  className={[
+                    "p-4 rounded-md border text-left transition",
+                    selectedPreset === "custom"
+                      ? "border-[color:var(--accent-60)] bg-[color:var(--accent-10)]"
+                      : "border-white/10 hover:border-white/20",
+                  ].join(" ")}
+                >
+                  <div className="text-white font-semibold">Custom setup</div>
+                  <div className="text-gray-400 text-sm mt-1">
+                    Define targets from scratch.
+                  </div>
+                </button>
               </div>
             </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setStep("domains")}
+                className="px-4 py-3 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => setStep("goals")}
+                className="px-4 py-3 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:border-[color:var(--accent)] transition"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        ) : null}
 
-            {(Object.keys(GOAL_OPTIONS) as GoalCategoryKey[]).map((category) => (
+        {step === "goals" ? (
+          <div className="mt-6 space-y-6">
+            {normalizedConfig.enabledCategories.map((category) => (
               <div key={category} className="command-surface rounded-md p-6">
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-semibold capitalize">{category}</div>
+                  <div className="text-2xl font-semibold">
+                    {GOAL_CATEGORY_LABELS[category]}
+                  </div>
                   <label className="flex items-center gap-2 text-sm text-gray-400">
                     <input
                       type="checkbox"
@@ -340,11 +470,59 @@ export default function OnboardingClient() {
             {error ? <div className="text-red-400 text-sm">{error}</div> : null}
             <div className="flex items-center gap-3">
               <button
+                onClick={() => setStep("path")}
+                className="px-4 py-3 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => setStep("confirm")}
+                className="px-4 py-3 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:border-[color:var(--accent)] transition"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {step === "confirm" ? (
+          <div className="mt-6 space-y-6">
+            <div className="command-surface rounded-md p-6">
+              <div className="text-xl font-semibold">Summary</div>
+              <div className="mt-4 space-y-4">
+                {normalizedConfig.enabledCategories.map((category) => (
+                  <div key={category} className="border border-white/10 rounded-md p-4">
+                    <div className="text-white font-semibold">
+                      {GOAL_CATEGORY_LABELS[category]}
+                    </div>
+                    <div className="mt-2 text-gray-400 text-sm">
+                      {normalizedConfig.categories[category].enabled.length
+                        ? normalizedConfig.categories[category].enabled
+                            .map((key) => {
+                              const value = normalizedConfig.categories[category].targets[key];
+                              return `${key.replaceAll("_", " ")}: ${value}`;
+                            })
+                            .join(" • ")
+                        : "No active variables"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {error ? <div className="text-red-400 text-sm">{error}</div> : null}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setStep("goals")}
+                className="px-4 py-3 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+              >
+                Back
+              </button>
+              <button
                 onClick={saveGoals}
                 disabled={saving}
                 className="px-4 py-3 rounded-md border border-[color:var(--accent-60)] text-[color:var(--accent)] hover:border-[color:var(--accent)] transition disabled:opacity-50"
               >
-                {saving ? "Saving…" : "Apply goals"}
+                {saving ? "Saving…" : "Define Your Standard"}
               </button>
               {previewMode ? (
                 <button
@@ -356,7 +534,7 @@ export default function OnboardingClient() {
               ) : null}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </main>
   );

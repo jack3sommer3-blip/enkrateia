@@ -10,6 +10,7 @@ import {
   normalizeGoalConfig,
   GOAL_BOUNDS,
   GOAL_OPTIONS,
+  GOAL_CATEGORY_LABELS,
   GOAL_PRESETS,
   getPresetConfig,
 } from "@/lib/goals";
@@ -109,10 +110,13 @@ export default function GoalsPage() {
 
   const validateGoals = () => {
     for (const category of goalConfig.enabledCategories) {
+      if (!goalConfig.categories[category].enabled.length) {
+        return `Select at least one variable in ${GOAL_CATEGORY_LABELS[category]}.`;
+      }
       for (const key of goalConfig.categories[category].enabled) {
         const value = goalConfig.categories[category].targets[key];
-        if (!value || value <= 0) {
-          return `Target for ${key.replaceAll("_", " ")} must be greater than 0.`;
+        if (value == null || Number.isNaN(value) || value < 0) {
+          return `Target for ${key.replaceAll("_", " ")} must be 0 or higher.`;
         }
       }
     }
@@ -170,9 +174,9 @@ export default function GoalsPage() {
 
         <section className="space-y-6">
           <div className="command-surface rounded-md p-6">
-            <div className="text-xl font-semibold">Presets</div>
+            <div className="text-xl font-semibold">Structured paths</div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {GOAL_PRESETS.map((preset) => (
+              {GOAL_PRESETS.filter((preset) => preset.id !== "default").map((preset) => (
                 <button
                   key={preset.id}
                   onClick={() => selectPreset(preset.id)}
@@ -200,7 +204,9 @@ export default function GoalsPage() {
           {(Object.keys(GOAL_OPTIONS) as GoalCategoryKey[]).map((category) => (
             <div key={category} className="command-surface rounded-md p-6">
               <div className="flex items-center justify-between">
-                <div className="text-2xl font-semibold capitalize">{category}</div>
+                <div className="text-2xl font-semibold">
+                  {GOAL_CATEGORY_LABELS[category]}
+                </div>
                 <label className="flex items-center gap-2 text-sm text-gray-400">
                   <input
                     type="checkbox"

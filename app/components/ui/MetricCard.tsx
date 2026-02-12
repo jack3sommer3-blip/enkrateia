@@ -4,12 +4,14 @@ export default function MetricCard({
   delta,
   positive,
   subtext,
+  deltaLabel = "from prior period",
 }: {
   label: string;
   value: string;
   delta?: string;
   positive?: boolean;
   subtext?: string;
+  deltaLabel?: string;
 }) {
   return (
     <div className="command-surface rounded-md p-6 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
@@ -22,7 +24,7 @@ export default function MetricCard({
           >
             {delta}
           </span>
-          <span className="text-gray-500"> from last week</span>
+          <span className="text-gray-500"> {deltaLabel}</span>
         </div>
       ) : subtext ? (
         <div className="mt-2 text-sm text-gray-500">{subtext}</div>

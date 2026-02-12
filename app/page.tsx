@@ -19,6 +19,7 @@ type LogRow = {
   sleep_score: number;
   diet_score: number;
   reading_score: number;
+  community_score: number;
 };
 
 export default function DashboardPage() {
@@ -67,7 +68,7 @@ export default function DashboardPage() {
     supabase
       .from("daily_logs")
       .select(
-        "date,total_score,workout_score,sleep_score,diet_score,reading_score"
+        "date,total_score,workout_score,sleep_score,diet_score,reading_score,community_score"
       )
       .eq("user_id", userId)
       .gte("date", startKey)
@@ -82,7 +83,16 @@ export default function DashboardPage() {
             const sleep = Number(row.sleep_score ?? 0);
             const diet = Number(row.diet_score ?? 0);
             const reading = Number(row.reading_score ?? 0);
-            if (isFuture && total === 0 && workout === 0 && sleep === 0 && diet === 0 && reading === 0) {
+            const community = Number(row.community_score ?? 0);
+            if (
+              isFuture &&
+              total === 0 &&
+              workout === 0 &&
+              sleep === 0 &&
+              diet === 0 &&
+              reading === 0 &&
+              community === 0
+            ) {
               return false;
             }
             return true;
@@ -94,6 +104,7 @@ export default function DashboardPage() {
             sleep_score: Number(row.sleep_score ?? 0),
             diet_score: Number(row.diet_score ?? 0),
             reading_score: Number(row.reading_score ?? 0),
+            community_score: Number(row.community_score ?? 0),
           })) as LogRow[];
         setLogs(rows);
         setLogsLoading(false);
@@ -157,6 +168,7 @@ export default function DashboardPage() {
       sleep: { recent: 0, prior: 0, r: 0, p: 0 },
       diet: { recent: 0, prior: 0, r: 0, p: 0 },
       reading: { recent: 0, prior: 0, r: 0, p: 0 },
+      community: { recent: 0, prior: 0, r: 0, p: 0 },
     };
 
     for (let i = 0; i < 14; i += 1) {
@@ -172,6 +184,8 @@ export default function DashboardPage() {
       buckets.diet[target === "recent" ? "r" : "p"] += 1;
       buckets.reading[target] += row.reading_score ?? 0;
       buckets.reading[target === "recent" ? "r" : "p"] += 1;
+      buckets.community[target] += row.community_score ?? 0;
+      buckets.community[target === "recent" ? "r" : "p"] += 1;
     }
 
     const diffs = [
@@ -194,10 +208,16 @@ export default function DashboardPage() {
           (buckets.diet.p ? buckets.diet.prior / buckets.diet.p : 0),
       },
       {
-        label: "Reading",
+        label: "Knowledge",
         diff:
           (buckets.reading.r ? buckets.reading.recent / buckets.reading.r : 0) -
           (buckets.reading.p ? buckets.reading.prior / buckets.reading.p : 0),
+      },
+      {
+        label: "Community",
+        diff:
+          (buckets.community.r ? buckets.community.recent / buckets.community.r : 0) -
+          (buckets.community.p ? buckets.community.prior / buckets.community.p : 0),
       },
     ];
 
@@ -231,8 +251,20 @@ export default function DashboardPage() {
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <MetricCard label="7-Day Avg" value={formatScore(avg7)} delta="+4.2" positive />
-          <MetricCard label="30-Day Avg" value={formatScore(avg30)} delta="+1.1" positive />
+          <MetricCard
+            label="7-Day Avg"
+            value={formatScore(avg7)}
+            delta="+4.2"
+            deltaLabel="from prior 7 days"
+            positive
+          />
+          <MetricCard
+            label="30-Day Avg"
+            value={formatScore(avg30)}
+            delta="+1.1"
+            deltaLabel="from prior 30 days"
+            positive
+          />
           <MetricCard label="Most Improved" value={mostImproved} subtext="Last 14 days" />
           <MetricCard
             label="Consistency"

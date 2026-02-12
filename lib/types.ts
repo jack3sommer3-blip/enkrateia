@@ -42,6 +42,11 @@ export type DayData = {
     note?: string;
     quote?: string;
   };
+  community?: {
+    callsText?: string;
+    socialEventsText?: string;
+    note?: string;
+  };
 };
 
 export type DayScore = {
@@ -50,6 +55,7 @@ export type DayScore = {
   sleepScore: number;
   dietScore: number;
   readingScore: number;
+  communityScore: number;
   dietScoreBase100: number;
   dietScoreFinal100: number;
   dietPenaltyTotal: number;
@@ -78,13 +84,14 @@ export type GoalCategory = {
   targets: Record<string, number>;
 };
 
-export type GoalCategoryKey = "exercise" | "sleep" | "diet" | "reading";
+export type GoalCategoryKey = "exercise" | "sleep" | "diet" | "reading" | "community";
 
 export type Goals = {
   exercise: GoalCategory;
   sleep: GoalCategory;
   diet: GoalCategory;
   reading: GoalCategory;
+  community: GoalCategory;
 };
 
 export type GoalConfig = {

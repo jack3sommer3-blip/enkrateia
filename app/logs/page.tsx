@@ -30,6 +30,7 @@ type LogRow = {
   sleep_score: number;
   diet_score: number;
   reading_score: number;
+  community_score: number;
 };
 
 export default function LogsPage() {
@@ -44,6 +45,7 @@ export default function LogsPage() {
   const [logsLoading, setLogsLoading] = useState(true);
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
+  const [enabledCategories, setEnabledCategories] = useState<string[]>([]);
   const logRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -69,13 +71,14 @@ export default function LogsPage() {
     if (loading || !userId) return;
     supabase
       .from("user_goals")
-      .select("onboarding_completed")
+      .select("onboarding_completed, enabled_categories")
       .eq("user_id", userId)
       .maybeSingle()
       .then(({ data }) => {
         if (!data?.onboarding_completed) {
           router.replace("/onboarding");
         }
+        setEnabledCategories(data?.enabled_categories ?? []);
       });
   }, [loading, router, userId]);
 
@@ -91,7 +94,7 @@ export default function LogsPage() {
 
     supabase
       .from("daily_logs")
-      .select("date,total_score,workout_score,sleep_score,diet_score,reading_score")
+      .select("date,total_score,workout_score,sleep_score,diet_score,reading_score,community_score")
       .eq("user_id", userId)
       .gte("date", startKey)
       .lte("date", endKey)
@@ -106,7 +109,16 @@ export default function LogsPage() {
             const sleep = Number(row.sleep_score ?? 0);
             const diet = Number(row.diet_score ?? 0);
             const reading = Number(row.reading_score ?? 0);
-            if (isFuture && total === 0 && workout === 0 && sleep === 0 && diet === 0 && reading === 0) {
+            const community = Number(row.community_score ?? 0);
+            if (
+              isFuture &&
+              total === 0 &&
+              workout === 0 &&
+              sleep === 0 &&
+              diet === 0 &&
+              reading === 0 &&
+              community === 0
+            ) {
               return false;
             }
             return true;
@@ -118,6 +130,7 @@ export default function LogsPage() {
             sleep_score: Number(row.sleep_score ?? 0),
             diet_score: Number(row.diet_score ?? 0),
             reading_score: Number(row.reading_score ?? 0),
+            community_score: Number(row.community_score ?? 0),
           })) as LogRow[];
         setLogs(rows);
         setLogsLoading(false);
@@ -134,6 +147,7 @@ export default function LogsPage() {
           sleepScore: number;
           dietScore: number;
           readingScore: number;
+          communityScore: number;
         };
       };
       if (!detail?.date) return;
@@ -149,6 +163,7 @@ export default function LogsPage() {
           sleep_score: detail.scores.sleepScore,
           diet_score: detail.scores.dietScore,
           reading_score: detail.scores.readingScore,
+          community_score: detail.scores.communityScore,
         };
         if (exists) {
           return prev.map((row) => (row.date === detail.date ? updated : row));
@@ -314,11 +329,16 @@ export default function LogsPage() {
               {selectedRow ? (
                 <div className="mt-3 space-y-3 text-sm">
                 {[
-                  { label: "Exercise", score: selectedRow.workout_score },
-                  { label: "Sleep", score: selectedRow.sleep_score },
-                  { label: "Diet", score: selectedRow.diet_score },
-                  { label: "Reading", score: selectedRow.reading_score },
-                ].map((category) => {
+                  { key: "exercise", label: "Exercise", score: selectedRow.workout_score },
+                  { key: "sleep", label: "Sleep", score: selectedRow.sleep_score },
+                  { key: "diet", label: "Diet", score: selectedRow.diet_score },
+                  { key: "reading", label: "Knowledge", score: selectedRow.reading_score },
+                  { key: "community", label: "Community", score: selectedRow.community_score },
+                ]
+                  .filter((category) =>
+                    enabledCategories.length ? enabledCategories.includes(category.key) : true
+                  )
+                  .map((category) => {
                     const percent = Math.min(100, Math.max(0, (category.score / 25) * 100));
                     return (
                       <div

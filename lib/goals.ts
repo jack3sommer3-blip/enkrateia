@@ -5,7 +5,16 @@ export const GOAL_CATEGORIES: GoalCategoryKey[] = [
   "sleep",
   "diet",
   "reading",
+  "community",
 ];
+
+export const GOAL_CATEGORY_LABELS: Record<GoalCategoryKey, string> = {
+  exercise: "Exercise",
+  sleep: "Sleep",
+  diet: "Diet",
+  reading: "Knowledge",
+  community: "Community",
+};
 
 const DEFAULT_GOALS: Goals = {
   exercise: {
@@ -24,6 +33,13 @@ const DEFAULT_GOALS: Goals = {
     enabled: ["pages"],
     targets: { pages: 20 },
   },
+  community: {
+    enabled: [],
+    targets: {
+      calls_weekly: 1,
+      social_events_weekly: 1,
+    },
+  },
 };
 
 export const GOAL_BOUNDS: Record<string, { min: number; max: number }> = {
@@ -31,6 +47,7 @@ export const GOAL_BOUNDS: Record<string, { min: number; max: number }> = {
   calories_burned: { min: 1, max: 3000 },
   steps: { min: 100, max: 50000 },
   workouts_logged: { min: 1, max: 10 },
+  workouts_logged_weekly: { min: 1, max: 20 },
   hours: { min: 1, max: 16 },
   meals_cooked_percent: { min: 1, max: 100 },
   healthiness_self_rating: { min: 1, max: 10 },
@@ -38,6 +55,8 @@ export const GOAL_BOUNDS: Record<string, { min: number; max: number }> = {
   pages: { min: 1, max: 500 },
   fiction_pages: { min: 1, max: 500 },
   nonfiction_pages: { min: 1, max: 500 },
+  calls_weekly: { min: 0, max: 14 },
+  social_events_weekly: { min: 0, max: 14 },
 };
 
 function clampTarget(key: string, value: number) {
@@ -52,7 +71,7 @@ export function getDefaultGoals(): Goals {
 
 export function getDefaultGoalConfig(): GoalConfig {
   return {
-    enabledCategories: [...GOAL_CATEGORIES],
+    enabledCategories: ["exercise", "sleep", "diet", "reading"],
     categories: getDefaultGoals(),
     presetId: "default",
   };
@@ -62,7 +81,7 @@ export function normalizeGoals(input?: Partial<Goals> | null): Goals {
   const base = getDefaultGoals();
   if (!input) return base;
 
-  (["exercise", "sleep", "diet", "reading"] as const).forEach((category) => {
+  (["exercise", "sleep", "diet", "reading", "community"] as const).forEach((category) => {
     const incoming = input[category];
     if (!incoming) return;
     if (Array.isArray(incoming.enabled)) {
@@ -98,6 +117,8 @@ export function normalizeGoalConfig(
     enabledCategoriesOverride ??
     base.enabledCategories;
 
+  assertNoKnowledgeKey(enabledRaw);
+
   const enabledCategories = (Array.isArray(enabledRaw) ? enabledRaw : [])
     .filter((key) => GOAL_CATEGORIES.includes(key as GoalCategoryKey)) as GoalCategoryKey[];
 
@@ -106,6 +127,33 @@ export function normalizeGoalConfig(
     categories,
     presetId: (input as GoalConfig).presetId ?? (input as any).preset ?? base.presetId,
   };
+}
+
+function assertNoKnowledgeKey(enabledRaw?: string[] | null) {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    Array.isArray(enabledRaw) &&
+    enabledRaw.includes("knowledge")
+  ) {
+    throw new Error("Invalid category key 'knowledge'. Use 'reading'.");
+  }
+}
+
+export function clearEnabledVariablesForDomains(
+  config: GoalConfig,
+  domains: GoalCategoryKey[]
+): GoalConfig {
+  const next = {
+    ...config,
+    categories: { ...config.categories },
+  };
+  domains.forEach((category) => {
+    next.categories[category] = {
+      ...next.categories[category],
+      enabled: [],
+    };
+  });
+  return next;
 }
 
 export type GoalPreset = {
@@ -120,7 +168,7 @@ export const GOAL_PRESETS: GoalPreset[] = [
   {
     id: "default",
     name: "Default",
-    description: "Balanced baseline across exercise, sleep, diet, and reading.",
+    description: "Baseline across exercise, sleep, diet, and knowledge.",
     config: getDefaultGoalConfig(),
   },
   {
@@ -150,8 +198,140 @@ export const GOAL_PRESETS: GoalPreset[] = [
           enabled: ["hours"],
           targets: { hours: 8 },
         },
+        community: {
+          enabled: [],
+          targets: { calls_weekly: 1, social_events_weekly: 1 },
+        },
       },
       presetId: "75-hard",
+    },
+  },
+  {
+    id: "75-soft",
+    name: "75 Soft",
+    description: "Progressive structure with sustainable targets.",
+    config: {
+      enabledCategories: ["exercise", "diet", "reading", "sleep", "community"],
+      categories: {
+        ...getDefaultGoals(),
+        exercise: {
+          enabled: ["minutes", "workouts_logged"],
+          targets: { minutes: 45, workouts_logged: 1 },
+        },
+        diet: {
+          enabled: ["meals_cooked_percent", "healthiness_self_rating"],
+          targets: { meals_cooked_percent: 80, healthiness_self_rating: 7 },
+        },
+        reading: {
+          enabled: ["pages"],
+          targets: { pages: 10 },
+        },
+        sleep: {
+          enabled: ["hours"],
+          targets: { hours: 7.5 },
+        },
+        community: {
+          enabled: ["calls_weekly", "social_events_weekly"],
+          targets: { calls_weekly: 1, social_events_weekly: 1 },
+        },
+      },
+      presetId: "75-soft",
+    },
+  },
+  {
+    id: "jacks-standard",
+    name: "Jack’s Standard",
+    description: "High-output daily baseline with knowledge and community focus.",
+    config: {
+      enabledCategories: ["exercise", "sleep", "diet", "reading", "community"],
+      categories: {
+        ...getDefaultGoals(),
+        exercise: {
+          enabled: ["minutes", "steps"],
+          targets: { minutes: 60, steps: 9000 },
+        },
+        diet: {
+          enabled: ["meals_cooked_percent"],
+          targets: { meals_cooked_percent: 90 },
+        },
+        reading: {
+          enabled: ["pages"],
+          targets: { pages: 20 },
+        },
+        sleep: {
+          enabled: ["hours"],
+          targets: { hours: 7.5 },
+        },
+        community: {
+          enabled: ["calls_weekly"],
+          targets: { calls_weekly: 1, social_events_weekly: 1 },
+        },
+      },
+      presetId: "jacks-standard",
+    },
+  },
+  {
+    id: "operator-baseline",
+    name: "Operator Baseline",
+    description: "Performance-focused conditioning and recovery.",
+    config: {
+      enabledCategories: ["exercise", "sleep", "diet"],
+      categories: {
+        ...getDefaultGoals(),
+        exercise: {
+          enabled: ["minutes", "calories_burned", "workouts_logged"],
+          targets: { minutes: 75, calories_burned: 700, workouts_logged: 1 },
+        },
+        diet: {
+          enabled: ["meals_cooked_percent", "protein_grams"],
+          targets: { meals_cooked_percent: 90, protein_grams: 160 },
+        },
+        sleep: {
+          enabled: ["hours"],
+          targets: { hours: 8 },
+        },
+        reading: {
+          enabled: [],
+          targets: { pages: 10 },
+        },
+        community: {
+          enabled: [],
+          targets: { calls_weekly: 1, social_events_weekly: 1 },
+        },
+      },
+      presetId: "operator-baseline",
+    },
+  },
+  {
+    id: "scholars-track",
+    name: "Scholar’s Track",
+    description: "Knowledge-heavy focus with recovery and minimal exercise.",
+    config: {
+      enabledCategories: ["reading", "sleep", "exercise"],
+      categories: {
+        ...getDefaultGoals(),
+        reading: {
+          enabled: ["pages"],
+          targets: { pages: 40 },
+        },
+        sleep: {
+          enabled: ["hours"],
+          targets: { hours: 8 },
+        },
+        exercise: {
+          enabled: ["minutes"],
+          targets: { minutes: 30 },
+        },
+        diet: {
+          enabled: [],
+          targets: { meals_cooked_percent: 100 },
+        },
+        community: {
+          enabled: [],
+          targets: { calls_weekly: 1, social_events_weekly: 1 },
+        },
+      },
+      presetId: "scholars-track",
     },
   },
 ];
@@ -169,6 +349,11 @@ export const GOAL_OPTIONS: Record<GoalCategoryKey, GoalOption[]> = {
     { key: "calories_burned", label: "Calories", hint: "Calories burned" },
     { key: "steps", label: "Steps", hint: "Daily steps" },
     { key: "workouts_logged", label: "Workouts logged", hint: "Count of workouts" },
+    {
+      key: "workouts_logged_weekly",
+      label: "Workouts (weekly)",
+      hint: "Total workouts per week",
+    },
   ],
   sleep: [{ key: "hours", label: "Hours", hint: "Total sleep hours" }],
   diet: [
@@ -188,6 +373,18 @@ export const GOAL_OPTIONS: Record<GoalCategoryKey, GoalOption[]> = {
     { key: "pages", label: "Pages", hint: "Total pages read" },
     { key: "fiction_pages", label: "Fiction pages", hint: "Fiction only" },
     { key: "nonfiction_pages", label: "Non-fiction pages", hint: "Non-fiction only" },
+  ],
+  community: [
+    {
+      key: "calls_weekly",
+      label: "Calls (weekly)",
+      hint: "Calls to friends or family per week",
+    },
+    {
+      key: "social_events_weekly",
+      label: "Social events (weekly)",
+      hint: "Social events attended per week",
+    },
   ],
 };
 

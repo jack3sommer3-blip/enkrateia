@@ -69,3 +69,22 @@ export function addDays(date: Date, count: number) {
   d.setDate(d.getDate() + count);
   return d;
 }
+
+export function getWeekWindow(date: Date) {
+  const base = startOfDay(date);
+  const day = base.getDay(); // 0 = Sunday
+  const diffToMonday = (day + 6) % 7;
+  const start = addDays(base, -diffToMonday);
+  const end = addDays(start, 6);
+  return {
+    start,
+    end,
+    startKey: toDateKey(start),
+    endKey: toDateKey(end),
+  };
+}
+
+export function getWeekWindowFromKey(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  return getWeekWindow(date);
+}

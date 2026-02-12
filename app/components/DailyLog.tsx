@@ -25,6 +25,7 @@ import {
   numFromText,
   textFromUnknown,
   todayKey,
+  getWeekWindowFromKey,
 } from "@/lib/utils";
 
 function makeEmptyDailyLog(): DayData {
@@ -45,6 +46,11 @@ function makeEmptyDailyLog(): DayData {
       nonfictionPagesText: undefined,
       note: undefined,
       quote: undefined,
+    },
+    community: {
+      callsText: undefined,
+      socialEventsText: undefined,
+      note: undefined,
     },
   };
 }
@@ -203,6 +209,7 @@ function splitHoursToParts(raw?: string) {
   };
 }
 
+
 function isValidWorkout(activity: WorkoutActivity) {
   const minutes = intFromText(activity.minutesText) ?? 0;
   const seconds = intFromText(activity.secondsText) ?? 0;
@@ -241,6 +248,10 @@ function hasMeaningfulData(data: DayData, drinkingEvents: DrinkingEvent[]) {
   if (readingEvents.some(isValidReading)) return true;
   if (data.reading.title || (intFromText(data.reading.pagesText) ?? 0) > 0) return true;
 
+  const calls = intFromText(data.community?.callsText) ?? 0;
+  const socialEvents = intFromText(data.community?.socialEventsText) ?? 0;
+  if (calls > 0 || socialEvents > 0) return true;
+
   if (drinkingEvents.some((event) => event.drinks > 0)) return true;
 
   return false;
@@ -271,6 +282,11 @@ export default function DailyLog({
   const prevDateRef = useRef(dateKey);
   // Root cause (Bug A): stale async loads + reused component state could leak data across dates.
   const activeDateRef = useRef(dateKey);
+  const [weeklyBase, setWeeklyBase] = useState({
+    workouts_logged_weekly: 0,
+    calls_weekly: 0,
+    social_events_weekly: 0,
+  });
   const latestRef = useRef<{
     data: DayData;
     goals: ReturnType<typeof getDefaultGoalConfig>;
@@ -383,6 +399,9 @@ export default function DailyLog({
             ...parsed?.reading,
             events: parsed?.reading?.events ?? (legacyReadingEvent ? [legacyReadingEvent] : []),
           },
+          community: {
+            ...parsed?.community,
+          },
         });
       } else {
         setData(makeEmptyDailyLog());
@@ -422,7 +441,7 @@ export default function DailyLog({
     if (!snapshot) return;
     if (snapshot.dateKey > todayKey()) return;
     if (!hasMeaningfulData(snapshot.data, snapshot.drinking)) return;
-    const scores = computeScores(snapshot.data, snapshot.goals, snapshot.drinking);
+    const scores = computeScores(snapshot.data, snapshot.goals, snapshot.drinking, weeklyActuals);
     const steps = intFromText(snapshot.data.workouts.stepsText);
     if (debugEnabled) {
       console.debug("[DailyLog] flush save", {
@@ -444,6 +463,7 @@ export default function DailyLog({
           sleep_score: scores.sleepScore,
           diet_score: scores.dietScore,
           reading_score: scores.readingScore,
+          community_score: scores.communityScore,
         },
         { onConflict: "user_id,date" }
       );
@@ -488,6 +508,46 @@ export default function DailyLog({
       if (!mounted) return;
       setDrinkingEvents(events);
     });
+    return () => {
+      mounted = false;
+    };
+  }, [userId, dateKey]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadWeeklyBase = async () => {
+      const { startKey, endKey } = getWeekWindowFromKey(dateKey);
+      const { data: rows, error } = await supabase
+        .from("daily_logs")
+        .select("date,data")
+        .eq("user_id", userId)
+        .gte("date", startKey)
+        .lte("date", endKey);
+      if (!mounted) return;
+      if (error || !rows) {
+        setWeeklyBase({ workouts_logged_weekly: 0, calls_weekly: 0, social_events_weekly: 0 });
+        return;
+      }
+
+      let workouts = 0;
+      let calls = 0;
+      let socials = 0;
+      rows.forEach((row) => {
+        if (row.date === dateKey) return;
+        const parsed = row.data as DayData;
+        workouts += parsed?.workouts?.activities?.length ?? 0;
+        calls += intFromText(parsed?.community?.callsText) ?? 0;
+        socials += intFromText(parsed?.community?.socialEventsText) ?? 0;
+      });
+
+      setWeeklyBase({
+        workouts_logged_weekly: workouts,
+        calls_weekly: calls,
+        social_events_weekly: socials,
+      });
+    };
+
+    loadWeeklyBase();
     return () => {
       mounted = false;
     };
@@ -564,7 +624,7 @@ export default function DailyLog({
         return;
       }
 
-      const scores = computeScores(data, goals, drinkingEvents);
+      const scores = computeScores(data, goals, drinkingEvents, weeklyActuals);
       const steps = intFromText(data.workouts.stepsText);
       if (debugEnabled) {
         console.debug("[DailyLog] autosave", {
@@ -583,6 +643,7 @@ export default function DailyLog({
         sleep_score: scores.sleepScore,
         diet_score: scores.dietScore,
         reading_score: scores.readingScore,
+        community_score: scores.communityScore,
       };
 
       const { error } = await supabase
@@ -649,15 +710,31 @@ export default function DailyLog({
     (sum, event) => sum + (event.nonfictionPages ?? 0),
     0
   );
-  const scores = computeScores(data, goals, drinkingEvents);
+  const weeklyActuals = useMemo(
+    () => ({
+      workouts_logged_weekly: weeklyBase.workouts_logged_weekly + data.workouts.activities.length,
+      calls_weekly:
+        intFromText(data.community?.callsText) ?? weeklyBase.calls_weekly,
+      social_events_weekly:
+        intFromText(data.community?.socialEventsText) ?? weeklyBase.social_events_weekly,
+    }),
+    [
+      weeklyBase,
+      data.workouts.activities.length,
+      data.community?.callsText,
+      data.community?.socialEventsText,
+    ]
+  );
+  const scores = computeScores(data, goals, drinkingEvents, weeklyActuals);
 
   const enabledCategories = goals.enabledCategories ?? [];
   const completedCount =
     (enabledCategories.includes("exercise") && scores.workoutScore >= 25 ? 1 : 0) +
     (enabledCategories.includes("sleep") && scores.sleepScore >= 25 ? 1 : 0) +
     (enabledCategories.includes("diet") && scores.dietScore >= 25 ? 1 : 0) +
-    (enabledCategories.includes("reading") && scores.readingScore >= 25 ? 1 : 0);
-  const totalCategories = enabledCategories.length || 4;
+    (enabledCategories.includes("reading") && scores.readingScore >= 25 ? 1 : 0) +
+    (enabledCategories.includes("community") && scores.communityScore >= 25 ? 1 : 0);
+  const totalCategories = enabledCategories.length || 0;
 
   const removeActivity = (activityId: string) => {
     setData((prev) => ({
@@ -717,7 +794,8 @@ export default function DailyLog({
         </header>
 
         <div className="grid grid-cols-1 gap-6">
-          <Card
+          {enabledCategories.includes("exercise") ? (
+            <Card
             title="Exercise"
             subtitle="Log activities; earn up to 25 points based on your goals."
             hint={`Total minutes today: ${formatScore(
@@ -931,7 +1009,9 @@ export default function DailyLog({
               </div>
             )}
           </Card>
+          ) : null}
 
+          {enabledCategories.includes("sleep") ? (
           <Card
             title="Sleep"
             subtitle="Earn up to 25 points based on your goals."
@@ -997,7 +1077,9 @@ export default function DailyLog({
               </div>
             </div>
           </Card>
+          ) : null}
 
+          {enabledCategories.includes("diet") ? (
           <Card
             title="Diet"
             subtitle="Earn up to 25 points based on your goals."
@@ -1081,9 +1163,74 @@ export default function DailyLog({
               </div>
             </div>
 
+          </Card>
+          ) : null}
+
+          {enabledCategories.includes("community") ? (
+          <Card
+            title="Community"
+            subtitle="Connection and social presence. Weekly targets count toward your score."
+            hint={`Calls (weekly): ${weeklyActuals.calls_weekly}  •  Social events (weekly): ${weeklyActuals.social_events_weekly}  •  Score: ${formatScore(
+              scores.communityScore
+            )}/25`}
+            earned={scores.communityScore >= 25}
+            score={scores.communityScore}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Calls to friends/family (this week)</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 1"
+                  isFutureDate={isFutureDate}
+                  value={data.community?.callsText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      community: { ...(prev.community ?? {}), callsText: value },
+                    }));
+                  }}
+                />
+              </div>
+              <div>
+                <Label>Social events attended (this week)</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 1"
+                  isFutureDate={isFutureDate}
+                  value={data.community?.socialEventsText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      community: { ...(prev.community ?? {}), socialEventsText: value },
+                    }));
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <Label>Notes</Label>
+              <TextArea
+                rows={3}
+                placeholder="Optional context"
+                isFutureDate={isFutureDate}
+                value={data.community?.note ?? ""}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setData((prev) => ({
+                    ...prev,
+                    community: { ...(prev.community ?? {}), note: value },
+                  }));
+                }}
+              />
+            </div>
+
             <div className="mt-6 p-4 rounded-md border border-white/10 bg-black/40">
               <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold">Drinking</div>
+                <div className="text-lg font-semibold">Social + drinking</div>
                 <button
                   onClick={() => setDrinkingOpen((prev) => !prev)}
                   disabled={isFutureDate}
@@ -1093,12 +1240,12 @@ export default function DailyLog({
                 </button>
               </div>
 
-            {drinkingOpen ? (
-              <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
-                <div className="w-full max-w-2xl rounded-md border border-white/10 command-surface-elevated p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xl font-semibold">
-                      {drinkingEditId ? "Edit drinking event" : "Add drinking event"}
+              {drinkingOpen ? (
+                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6">
+                  <div className="w-full max-w-2xl rounded-md border border-white/10 command-surface-elevated p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xl font-semibold">
+                        {drinkingEditId ? "Edit drinking event" : "Add drinking event"}
                       </div>
                       <button
                         onClick={() => {
@@ -1153,87 +1300,88 @@ export default function DailyLog({
                           isFutureDate={isFutureDate}
                         />
                       </div>
-                    <div className="md:col-span-3 flex items-center gap-3">
-                      <button
-                        onClick={async () => {
-                          const drinkValue = drinkingDrinksRef.current?.value ?? "0";
-                          const noteValue = drinkingNoteRef.current?.value ?? "";
-                          const drinks = Math.max(
-                            0,
-                            Math.min(20, Number(drinkValue) || 0)
-                          );
-                          if (drinkingEditId) {
-                            const updated = await updateDrinkingEvent(drinkingEditId, {
-                              tier: drinkingTier,
-                              drinks,
-                              note: noteValue.trim() || null,
-                            });
-                            if (updated) {
-                              setDrinkingEvents((prev) =>
-                                prev.map((event) =>
-                                  event.id === updated.id ? updated : event
-                                )
-                              );
-                              if (isValidDrinking(updated.drinks)) {
-                                await updateFeedItemByEvent("drinking", updated.id, {
-                                  summary: `Tier ${updated.tier} • ${updated.drinks} drinks`,
-                                  metadata: {
-                                    tier: updated.tier,
-                                    drinks: updated.drinks,
-                                    note: updated.note,
-                                  },
-                                });
-                              } else {
-                                await deleteFeedItemByEvent("drinking", updated.id);
+                      <div className="md:col-span-3 flex items-center gap-3">
+                        <button
+                          onClick={async () => {
+                            const drinkValue = drinkingDrinksRef.current?.value ?? "0";
+                            const noteValue = drinkingNoteRef.current?.value ?? "";
+                            const drinks = Math.max(
+                              0,
+                              Math.min(20, Number(drinkValue) || 0)
+                            );
+                            if (drinkingEditId) {
+                              const updated = await updateDrinkingEvent(drinkingEditId, {
+                                tier: drinkingTier,
+                                drinks,
+                                note: noteValue.trim() || null,
+                              });
+                              if (updated) {
+                                setDrinkingEvents((prev) =>
+                                  prev.map((event) =>
+                                    event.id === updated.id ? updated : event
+                                  )
+                                );
+                                if (isValidDrinking(updated.drinks)) {
+                                  await updateFeedItemByEvent("drinking", updated.id, {
+                                    summary: `Tier ${updated.tier} • ${updated.drinks} drinks`,
+                                    metadata: {
+                                      tier: updated.tier,
+                                      drinks: updated.drinks,
+                                      note: updated.note,
+                                    },
+                                  });
+                                } else {
+                                  await deleteFeedItemByEvent("drinking", updated.id);
+                                }
+                                setDrinkingEditId(null);
+                                setDrinkingOpen(false);
                               }
-                              setDrinkingEditId(null);
-                              setDrinkingOpen(false);
-                            }
-                          } else {
-                            const created = await createDrinkingEvent({
-                              user_id: userId,
-                              date: dateKey,
-                              tier: drinkingTier,
-                              drinks,
-                              note: noteValue.trim() || null,
-                            });
-                            if (created) {
-                              setDrinkingEvents((prev) => [...prev, created]);
-                              if (isValidDrinking(created.drinks)) {
-                                await upsertFeedItem({
-                                  user_id: userId,
-                                  event_date: dateKey,
-                                  event_type: "drinking",
-                                  event_id: created.id,
-                                  summary: `Tier ${created.tier} • ${created.drinks} drinks`,
-                                  metadata: {
-                                    tier: created.tier,
-                                    drinks: created.drinks,
-                                    note: created.note,
-                                  },
-                                });
+                            } else {
+                              const created = await createDrinkingEvent({
+                                user_id: userId,
+                                date: dateKey,
+                                tier: drinkingTier,
+                                drinks,
+                                note: noteValue.trim() || null,
+                              });
+                              if (created) {
+                                setDrinkingEvents((prev) => [...prev, created]);
+                                if (isValidDrinking(created.drinks)) {
+                                  await upsertFeedItem({
+                                    user_id: userId,
+                                    event_date: dateKey,
+                                    event_type: "drinking",
+                                    event_id: created.id,
+                                    summary: `Tier ${created.tier} • ${created.drinks} drinks`,
+                                    metadata: {
+                                      tier: created.tier,
+                                      drinks: created.drinks,
+                                      note: created.note,
+                                    },
+                                  });
+                                }
+                                if (drinkingDrinksRef.current)
+                                  drinkingDrinksRef.current.value = "0";
+                                if (drinkingNoteRef.current)
+                                  drinkingNoteRef.current.value = "";
+                                setDrinkingOpen(false);
                               }
-                              if (drinkingDrinksRef.current)
-                                drinkingDrinksRef.current.value = "0";
-                              if (drinkingNoteRef.current) drinkingNoteRef.current.value = "";
-                              setDrinkingOpen(false);
                             }
-                          }
-                        }}
-                        className="px-4 py-2 rounded-md border border-[color:var(--accent-40)] text-[color:var(--accent)] hover:border-[color:var(--accent-60)] transition"
-                      >
-                        {drinkingEditId ? "Save changes" : "Save drinking event"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setDrinkingOpen(false);
-                          setDrinkingEditId(null);
-                        }}
-                        className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 transition"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                          }}
+                          className="px-4 py-2 rounded-md border border-[color:var(--accent-40)] text-[color:var(--accent)] hover:border-[color:var(--accent-60)] transition"
+                        >
+                          {drinkingEditId ? "Save changes" : "Save drinking event"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDrinkingOpen(false);
+                            setDrinkingEditId(null);
+                          }}
+                          className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1283,9 +1431,11 @@ export default function DailyLog({
               </div>
             </div>
           </Card>
+          ) : null}
 
+          {enabledCategories.includes("reading") ? (
           <Card
-            title="Reading"
+            title="Knowledge"
             subtitle="Log what you read; earn up to 25 points based on your goals."
             hint={`Pages today: ${pagesRead}  •  Score: ${formatScore(
               scores.readingScore
@@ -1499,6 +1649,7 @@ export default function DailyLog({
               )}
             </div>
           </Card>
+          ) : null}
         </div>
       </div>
   );

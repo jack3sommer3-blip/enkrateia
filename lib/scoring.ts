@@ -2,10 +2,17 @@ import { DayData, DayScore, Goals, GoalConfig, DrinkingEvent, ReadingEvent } fro
 import { computeCategoryScore, getDefaultGoals, normalizeGoalConfig } from "@/lib/goals";
 import { clampInt, intFromText, numFromText } from "@/lib/utils";
 
+type WeeklyActuals = {
+  workouts_logged_weekly?: number;
+  calls_weekly?: number;
+  social_events_weekly?: number;
+};
+
 export function computeScores(
   data: DayData,
   goalsInput?: GoalConfig | Goals | null,
-  drinkingEvents: DrinkingEvent[] = []
+  drinkingEvents: DrinkingEvent[] = [],
+  weeklyActuals: WeeklyActuals = {}
 ): DayScore {
   const defaultGoals = getDefaultGoals();
   const config = normalizeGoalConfig(goalsInput as GoalConfig | Goals | null);
@@ -51,6 +58,8 @@ export function computeScores(
   const pagesRead = pagesReadRaw || eventPages || fictionPages + nonfictionPages;
   const healthiness = numFromText(data.diet.healthinessText) ?? 0;
   const protein = numFromText(data.diet.proteinText) ?? 0;
+  const communityCalls = numFromText(data.community?.callsText) ?? 0;
+  const communitySocialEvents = numFromText(data.community?.socialEventsText) ?? 0;
 
   const dietCookedPercent =
     totalMeals > 0 ? (cookedMeals / totalMeals) * 100 : 0;
@@ -61,6 +70,7 @@ export function computeScores(
       calories_burned: totalWorkoutCalories,
       steps,
       workouts_logged: workoutsLogged,
+      workouts_logged_weekly: weeklyActuals.workouts_logged_weekly ?? 0,
     },
     goals.exercise,
     defaultGoals.exercise
@@ -92,6 +102,15 @@ export function computeScores(
     defaultGoals.reading
   );
 
+  const communityRatio = computeCategoryScore(
+    {
+      calls_weekly: weeklyActuals.calls_weekly ?? communityCalls,
+      social_events_weekly: weeklyActuals.social_events_weekly ?? communitySocialEvents,
+    },
+    goals.community,
+    defaultGoals.community
+  );
+
   const workoutScore = exerciseRatio * 25;
   const sleepScore = sleepRatio * 25;
   const dietScoreBase100 = dietRatio * 100;
@@ -99,6 +118,7 @@ export function computeScores(
   const dietScoreFinal100 = Math.max(0, dietScoreBase100 - penalty.total);
   const dietScore = (dietScoreFinal100 / 100) * 25;
   const readingScore = readingRatio * 25;
+  const communityScore = communityRatio * 25;
 
   const enabledCategories = config.enabledCategories;
   const ratios: Record<string, number> = {
@@ -106,6 +126,7 @@ export function computeScores(
     sleep: sleepRatio,
     diet: dietRatio,
     reading: readingRatio,
+    community: communityRatio,
   };
   const enabledRatios = enabledCategories.map((key) => ratios[key] ?? 0);
   const overallRatio =
@@ -119,6 +140,7 @@ export function computeScores(
     sleepScore: enabledCategories.includes("sleep") ? sleepScore : 0,
     dietScore: enabledCategories.includes("diet") ? dietScore : 0,
     readingScore: enabledCategories.includes("reading") ? readingScore : 0,
+    communityScore: enabledCategories.includes("community") ? communityScore : 0,
     dietScoreBase100,
     dietScoreFinal100,
     dietPenaltyTotal: penalty.total,

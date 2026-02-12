@@ -20,6 +20,7 @@ create table if not exists daily_logs (
   sleep_score numeric not null,
   diet_score numeric not null,
   reading_score numeric not null,
+  community_score numeric not null default 0,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   unique (user_id, date)

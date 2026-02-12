@@ -11,7 +11,7 @@ import type {
   ActivityItem,
   DrinkingEvent,
 } from "@/lib/types";
-import { addDays, intFromText, toDateKey } from "@/lib/utils";
+import { addDays, getWeekWindowFromKey, intFromText, toDateKey } from "@/lib/utils";
 import { computeScores } from "@/lib/scoring";
 
 export async function searchUsers(query: string) {
@@ -573,6 +573,32 @@ async function recomputeAndSaveDailyLog(
   if (drinkingError) return { ok: false, error: drinkingError.message };
 
   const drinkingEvents = (drinkingRows ?? []) as DrinkingEvent[];
+  const { startKey, endKey } = getWeekWindowFromKey(dateKey);
+  const { data: weekRows, error: weekError } = await supabase
+    .from("daily_logs")
+    .select("date,data")
+    .eq("user_id", userId)
+    .gte("date", startKey)
+    .lte("date", endKey);
+  if (weekError) return { ok: false, error: weekError.message };
+
+  let workoutsWeekly = 0;
+  let callsWeekly = 0;
+  let socialWeekly = 0;
+  (weekRows ?? []).forEach((row) => {
+    if (row.date === dateKey) return;
+    const parsed = row.data as DayData;
+    workoutsWeekly += parsed?.workouts?.activities?.length ?? 0;
+    callsWeekly += intFromText(parsed?.community?.callsText) ?? 0;
+    socialWeekly += intFromText(parsed?.community?.socialEventsText) ?? 0;
+  });
+
+  const weeklyActuals = {
+    workouts_logged_weekly: workoutsWeekly + (dataValue.workouts?.activities?.length ?? 0),
+    calls_weekly: intFromText(dataValue.community?.callsText) ?? callsWeekly,
+    social_events_weekly:
+      intFromText(dataValue.community?.socialEventsText) ?? socialWeekly,
+  };
   const scores = computeScores(
     dataValue,
     goalsRow
@@ -581,7 +607,8 @@ async function recomputeAndSaveDailyLog(
           enabledCategories: goalsRow.enabled_categories,
         }
       : null,
-    drinkingEvents
+    drinkingEvents,
+    weeklyActuals
   );
   const steps = intFromText(dataValue.workouts?.stepsText);
 
@@ -596,6 +623,7 @@ async function recomputeAndSaveDailyLog(
       sleep_score: scores.sleepScore,
       diet_score: scores.dietScore,
       reading_score: scores.readingScore,
+      community_score: scores.communityScore,
     },
     { onConflict: "user_id,date" }
   );

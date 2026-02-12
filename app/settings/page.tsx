@@ -162,6 +162,15 @@ export default function SettingsPage() {
             >
               Reset onboarding
             </button>
+            <button
+              onClick={async () => {
+                await supabase.from("user_goals").delete().eq("user_id", userId);
+                router.push("/onboarding?force=1");
+              }}
+              className="px-4 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+            >
+              Reset goals
+            </button>
             <div className="text-sm text-gray-500">
               Goals control how daily scores are calculated.
             </div>
