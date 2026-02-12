@@ -93,21 +93,6 @@ export default function GoalsPage() {
     });
   };
 
-  const bumpTarget = (category: GoalCategoryKey, key: string, delta: number) => {
-    const bounds = GOAL_BOUNDS[key];
-    const currentRaw = getTargetInputValue(category, key);
-    const current = Number(currentRaw);
-    const base = Number.isFinite(current) ? current : 0;
-    const nextValue = bounds
-      ? clampInt(Math.round(base + delta), bounds.min, bounds.max)
-      : base + delta;
-    updateTarget(category, key, String(nextValue));
-    setTargetEdits((prev) => {
-      const next = { ...prev };
-      delete next[targetKey(category, key)];
-      return next;
-    });
-  };
 
   const hudToggleClass = (active: boolean) =>
     [
@@ -132,27 +117,6 @@ export default function GoalsPage() {
     </span>
   );
 
-  const HudIconButton = ({
-    label,
-    onClick,
-    disabled,
-  }: {
-    label: "plus" | "minus";
-    onClick: () => void;
-    disabled?: boolean;
-  }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="h-9 w-9 rounded-full border border-white/10 text-gray-300 hover:border-white/20 hover:text-white transition flex items-center justify-center disabled:opacity-40"
-      aria-label={label}
-      type="button"
-    >
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5">
-        {label === "plus" ? <path d="M12 5v14M5 12h14" /> : <path d="M5 12h14" />}
-      </svg>
-    </button>
-  );
 
   const toggleVariable = (category: GoalCategoryKey, key: string) => {
     setGoalConfig((prev) => {
@@ -253,11 +217,10 @@ export default function GoalsPage() {
         <header className="mb-10">
           <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Goals</div>
           <h1 className="mt-3 text-4xl md:text-5xl font-bold leading-tight">
-            Scoring Configuration
+            Define your standard
           </h1>
           <p className="mt-2 text-sm text-gray-400">
-            Choose what counts toward scoring. Each enabled variable is weighted
-            equally in its category.
+            Choose from a structured path, or scroll down to build your own.
           </p>
         </header>
 
@@ -303,7 +266,9 @@ export default function GoalsPage() {
                   )}
                 >
                   <HudCheck active={normalizedConfig.enabledCategories.includes(category)} />
-                  Enabled
+                  {normalizedConfig.enabledCategories.includes(category)
+                    ? "Enabled"
+                    : "Not enabled"}
                 </button>
               </div>
               <div className="mt-4 space-y-4">
@@ -325,47 +290,37 @@ export default function GoalsPage() {
                         return (
                           <div
                             key={option.key}
-                            className="flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                            className="grid grid-cols-[minmax(0,1fr)_minmax(140px,180px)] items-center gap-4"
                           >
                             <button
                               onClick={() => toggleVariable(category, option.key)}
                               disabled={!categoryEnabled}
-                              className="flex items-center gap-3 text-left disabled:opacity-40"
+                              className="flex items-center gap-3 text-left min-w-0 disabled:opacity-40"
                             >
                               <HudCheck active={enabled} />
-                              <div>
-                                <div className="text-white">{option.label}</div>
-                                <div className="text-gray-500 text-sm">{option.hint}</div>
+                              <div className="min-w-0">
+                                <div className="text-white truncate">{option.label}</div>
+                                <div className="text-gray-500 text-sm truncate">
+                                  {option.hint}
+                                </div>
                               </div>
                             </button>
-                            <div className="flex items-center gap-2 w-full md:w-48">
-                              <HudIconButton
-                                label="minus"
-                                onClick={() => bumpTarget(category, option.key, -1)}
-                                disabled={!enabled || !categoryEnabled}
-                              />
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                disabled={!enabled || !categoryEnabled}
-                                value={getTargetInputValue(category, option.key)}
-                                onChange={(e) =>
-                                  setTargetEdits((prev) => ({
-                                    ...prev,
-                                    [targetKey(category, option.key)]: e.currentTarget.value,
-                                  }))
-                                }
-                                onBlur={(e) =>
-                                  commitTarget(category, option.key, e.currentTarget.value)
-                                }
-                                className="flex-1 px-4 py-2 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-40"
-                              />
-                              <HudIconButton
-                                label="plus"
-                                onClick={() => bumpTarget(category, option.key, 1)}
-                                disabled={!enabled || !categoryEnabled}
-                              />
-                            </div>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              disabled={!enabled || !categoryEnabled}
+                              value={getTargetInputValue(category, option.key)}
+                              onChange={(e) =>
+                                setTargetEdits((prev) => ({
+                                  ...prev,
+                                  [targetKey(category, option.key)]: e.currentTarget.value,
+                                }))
+                              }
+                              onBlur={(e) =>
+                                commitTarget(category, option.key, e.currentTarget.value)
+                              }
+                              className="w-full max-w-[180px] px-3 py-1.5 rounded-md bg-black border border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-white/10 disabled:opacity-40"
+                            />
                           </div>
                         );
                       })}
