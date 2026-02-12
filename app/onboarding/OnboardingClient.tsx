@@ -17,6 +17,7 @@ import {
   clearEnabledVariablesForDomains,
 } from "@/lib/goals";
 import type { GoalCategoryKey, GoalConfig } from "@/lib/types";
+import { clampInt } from "@/lib/utils";
 
 export default function OnboardingClient() {
   const router = useRouter();
@@ -37,6 +38,7 @@ export default function OnboardingClient() {
   const [loadingState, setLoadingState] = useState(true);
   const [goalConfig, setGoalConfig] = useState<GoalConfig>(getDefaultGoalConfig());
   const [selectedPreset, setSelectedPreset] = useState("default");
+  const [targetEdits, setTargetEdits] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (loading) return;
@@ -97,6 +99,91 @@ export default function OnboardingClient() {
     });
   };
 
+  const targetKey = (category: GoalCategoryKey, key: string) => `${category}.${key}`;
+
+  const getTargetInputValue = (category: GoalCategoryKey, key: string) => {
+    const edit = targetEdits[targetKey(category, key)];
+    if (edit !== undefined) return edit;
+    const value = normalizedConfig.categories[category].targets[key];
+    return value === undefined ? "" : String(value);
+  };
+
+  const commitTarget = (category: GoalCategoryKey, key: string, raw: string) => {
+    const bounds = GOAL_BOUNDS[key];
+    const n = Number(raw);
+    const fallback = Number.isFinite(n) ? n : 0;
+    const clamped = bounds
+      ? clampInt(Math.round(fallback), bounds.min, bounds.max)
+      : fallback;
+    updateTarget(category, key, String(clamped));
+    setTargetEdits((prev) => {
+      const next = { ...prev };
+      delete next[targetKey(category, key)];
+      return next;
+    });
+  };
+
+  const bumpTarget = (category: GoalCategoryKey, key: string, delta: number) => {
+    const bounds = GOAL_BOUNDS[key];
+    const currentRaw = getTargetInputValue(category, key);
+    const current = Number(currentRaw);
+    const base = Number.isFinite(current) ? current : 0;
+    const nextValue = bounds
+      ? clampInt(Math.round(base + delta), bounds.min, bounds.max)
+      : base + delta;
+    updateTarget(category, key, String(nextValue));
+    setTargetEdits((prev) => {
+      const next = { ...prev };
+      delete next[targetKey(category, key)];
+      return next;
+    });
+  };
+
+  const hudToggleClass = (active: boolean) =>
+    [
+      "inline-flex items-center gap-2 px-3 py-2 rounded-full border text-sm transition",
+      active
+        ? "border-[color:var(--accent-60)] text-[color:var(--accent)] bg-[color:var(--accent-10)]"
+        : "border-white/10 text-gray-400 hover:border-white/20",
+    ].join(" ");
+
+  const HudCheck = ({ active }: { active: boolean }) => (
+    <span
+      className={[
+        "h-5 w-5 rounded-full border flex items-center justify-center",
+        active
+          ? "border-[color:var(--accent-60)] text-[color:var(--accent)]"
+          : "border-white/20 text-transparent",
+      ].join(" ")}
+    >
+      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M5 13l4 4L19 7" />
+      </svg>
+    </span>
+  );
+
+  const HudIconButton = ({
+    label,
+    onClick,
+    disabled,
+  }: {
+    label: "plus" | "minus";
+    onClick: () => void;
+    disabled?: boolean;
+  }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="h-9 w-9 rounded-full border border-white/10 text-gray-300 hover:border-white/20 hover:text-white transition flex items-center justify-center disabled:opacity-40"
+      aria-label={label}
+      type="button"
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+        {label === "plus" ? <path d="M12 5v14M5 12h14" /> : <path d="M5 12h14" />}
+      </svg>
+    </button>
+  );
+
   const toggleVariable = (category: GoalCategoryKey, key: string) => {
     setGoalConfig((prev) => {
       const enabled = prev.categories[category].enabled.includes(key)
@@ -134,6 +221,7 @@ export default function OnboardingClient() {
         ...clearEnabledVariablesForDomains(prev, prev.enabledCategories),
         presetId: "custom",
       }));
+      setTargetEdits({});
       return;
     }
     const config = getPresetConfig(presetId);
@@ -151,6 +239,7 @@ export default function OnboardingClient() {
       };
     });
     setSelectedPreset(presetId);
+    setTargetEdits({});
   };
 
   const normalizedConfig = useMemo(() => normalizeGoalConfig(goalConfig), [goalConfig]);
@@ -237,7 +326,7 @@ export default function OnboardingClient() {
     const { error: saveError } = await supabase.from("user_goals").upsert(
       {
         user_id: userId,
-        goals: normalizedConfig.categories,
+        goals: { ...normalizedConfig.categories, preset: normalizedConfig.presetId },
         enabled_categories: normalizedConfig.enabledCategories,
         onboarding_completed: true,
         updated_at: new Date().toISOString(),
@@ -416,50 +505,77 @@ export default function OnboardingClient() {
                   <div className="text-2xl font-semibold">
                     {GOAL_CATEGORY_LABELS[category]}
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-400">
-                    <input
-                      type="checkbox"
-                      checked={normalizedConfig.enabledCategories.includes(category)}
-                      onChange={() => toggleCategory(category)}
-                      className="w-4 h-4 rounded border border-gray-600 bg-black"
-                    />
+                  <button
+                    onClick={() => toggleCategory(category)}
+                    className={hudToggleClass(
+                      normalizedConfig.enabledCategories.includes(category)
+                    )}
+                  >
+                    <HudCheck active={normalizedConfig.enabledCategories.includes(category)} />
                     Enabled
-                  </label>
+                  </button>
                 </div>
                 <div className="mt-4 space-y-4">
-                  {GOAL_OPTIONS[category].map((option) => {
+                  {(["daily", "weekly"] as const).map((cadence) => {
+                    const options = GOAL_OPTIONS[category].filter(
+                      (option) => option.cadence === cadence
+                    );
+                    if (!options.length) return null;
+                    return (
+                      <div key={cadence} className="space-y-3">
+                        <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
+                          {cadence === "daily" ? "Daily targets" : "Weekly targets"}
+                        </div>
+                        {options.map((option) => {
                     const enabled =
                       normalizedConfig.categories[category].enabled.includes(option.key);
                     const categoryEnabled =
                       normalizedConfig.enabledCategories.includes(category);
-                    const bounds = GOAL_BOUNDS[option.key];
                     return (
                       <div
                         key={option.key}
                         className="flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                       >
-                        <label className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={enabled}
-                            disabled={!categoryEnabled}
-                            onChange={() => toggleVariable(category, option.key)}
-                            className="w-5 h-5 rounded-full appearance-none border border-gray-600 bg-black checked:bg-[color:var(--accent)] checked:border-[color:var(--accent-60)] transition"
-                          />
+                        <button
+                          onClick={() => toggleVariable(category, option.key)}
+                          disabled={!categoryEnabled}
+                          className="flex items-center gap-3 text-left disabled:opacity-40"
+                        >
+                          <HudCheck active={enabled} />
                           <div>
                             <div className="text-white">{option.label}</div>
                             <div className="text-gray-500 text-sm">{option.hint}</div>
                           </div>
-                        </label>
-                        <input
-                          type="number"
-                          disabled={!enabled || !categoryEnabled}
-                          min={bounds?.min}
-                          max={bounds?.max}
-                          value={normalizedConfig.categories[category].targets[option.key] ?? ""}
-                          onChange={(e) => updateTarget(category, option.key, e.target.value)}
-                          className="w-full md:w-48 px-4 py-2 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-40"
-                        />
+                        </button>
+                        <div className="flex items-center gap-2 w-full md:w-48">
+                          <HudIconButton
+                            label="minus"
+                            onClick={() => bumpTarget(category, option.key, -1)}
+                            disabled={!enabled || !categoryEnabled}
+                          />
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            disabled={!enabled || !categoryEnabled}
+                            value={getTargetInputValue(category, option.key)}
+                            onChange={(e) =>
+                              setTargetEdits((prev) => ({
+                                ...prev,
+                                [targetKey(category, option.key)]: e.currentTarget.value,
+                              }))
+                            }
+                            onBlur={(e) => commitTarget(category, option.key, e.currentTarget.value)}
+                            className="flex-1 px-4 py-2 rounded-md bg-black border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-40"
+                          />
+                          <HudIconButton
+                            label="plus"
+                            onClick={() => bumpTarget(category, option.key, 1)}
+                            disabled={!enabled || !categoryEnabled}
+                          />
+                        </div>
+                      </div>
+                    );
+                        })}
                       </div>
                     );
                   })}

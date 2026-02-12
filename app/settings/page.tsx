@@ -149,7 +149,7 @@ export default function SettingsPage() {
                   .upsert(
                     {
                       user_id: userId,
-                      goals: getDefaultGoalConfig().categories,
+                      goals: { ...getDefaultGoalConfig().categories, preset: "default" },
                       enabled_categories: getDefaultGoalConfig().enabledCategories,
                       onboarding_completed: false,
                       updated_at: new Date().toISOString(),
@@ -189,7 +189,7 @@ export default function SettingsPage() {
                   await supabase.from("user_goals").upsert(
                     {
                       user_id: userId,
-                      goals: preset.categories,
+                      goals: { ...preset.categories, preset: preset.presetId ?? "75-hard" },
                       enabled_categories: preset.enabledCategories,
                       onboarding_completed: true,
                       updated_at: new Date().toISOString(),

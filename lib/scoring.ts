@@ -4,8 +4,10 @@ import { clampInt, intFromText, numFromText } from "@/lib/utils";
 
 type WeeklyActuals = {
   workouts_logged_weekly?: number;
-  calls_weekly?: number;
+  calls_friends_weekly?: number;
+  calls_family_weekly?: number;
   social_events_weekly?: number;
+  pages_weekly?: number;
 };
 
 export function computeScores(
@@ -59,6 +61,8 @@ export function computeScores(
   const healthiness = numFromText(data.diet.healthinessText) ?? 0;
   const protein = numFromText(data.diet.proteinText) ?? 0;
   const communityCalls = numFromText(data.community?.callsText) ?? 0;
+  const communityFriends = numFromText(data.community?.callsFriendsText) ?? 0;
+  const communityFamily = numFromText(data.community?.callsFamilyText) ?? 0;
   const communitySocialEvents = numFromText(data.community?.socialEventsText) ?? 0;
 
   const dietCookedPercent =
@@ -95,6 +99,7 @@ export function computeScores(
   const readingRatio = computeCategoryScore(
     {
       pages: pagesRead,
+      pages_weekly: weeklyActuals.pages_weekly ?? 0,
       fiction_pages: fictionPages,
       nonfiction_pages: nonfictionPages,
     },
@@ -104,7 +109,10 @@ export function computeScores(
 
   const communityRatio = computeCategoryScore(
     {
-      calls_weekly: weeklyActuals.calls_weekly ?? communityCalls,
+      calls_friends_weekly:
+        weeklyActuals.calls_friends_weekly ?? (communityFriends || communityCalls),
+      calls_family_weekly:
+        weeklyActuals.calls_family_weekly ?? (communityFamily || 0),
       social_events_weekly: weeklyActuals.social_events_weekly ?? communitySocialEvents,
     },
     goals.community,

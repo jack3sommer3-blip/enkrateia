@@ -172,9 +172,12 @@ function workoutSummary(activity: WorkoutActivity) {
       : seconds > 0
         ? `${seconds} sec`
         : undefined;
-  const parts = [activity.type, timeLabel, intensity ? `Intensity ${intensity}` : undefined].filter(
-    Boolean
-  );
+  const parts = [
+    activity.type,
+    activity.environment,
+    timeLabel,
+    intensity ? `Intensity ${intensity}` : undefined,
+  ].filter(Boolean);
   return parts.join(" • ");
 }
 
@@ -523,6 +526,7 @@ function activityFromWorkout(
       seconds: activity.secondsText,
       calories: activity.caloriesText,
       intensity: activity.intensityText,
+      environment: activity.environment,
     },
   };
 }
@@ -583,21 +587,55 @@ async function recomputeAndSaveDailyLog(
   if (weekError) return { ok: false, error: weekError.message };
 
   let workoutsWeekly = 0;
-  let callsWeekly = 0;
+  let callsFriendsWeekly = 0;
+  let callsFamilyWeekly = 0;
   let socialWeekly = 0;
+  let pagesWeekly = 0;
   (weekRows ?? []).forEach((row) => {
     if (row.date === dateKey) return;
     const parsed = row.data as DayData;
     workoutsWeekly += parsed?.workouts?.activities?.length ?? 0;
-    callsWeekly += intFromText(parsed?.community?.callsText) ?? 0;
+    callsFriendsWeekly +=
+      intFromText(parsed?.community?.callsFriendsText) ??
+      intFromText(parsed?.community?.callsText) ??
+      0;
+    callsFamilyWeekly += intFromText(parsed?.community?.callsFamilyText) ?? 0;
     socialWeekly += intFromText(parsed?.community?.socialEventsText) ?? 0;
+    const events = parsed?.reading?.events ?? [];
+    const eventPages = events.reduce((sum, event) => sum + (event.pages ?? 0), 0);
+    const eventFiction = events.reduce((sum, event) => sum + (event.fictionPages ?? 0), 0);
+    const eventNonfiction = events.reduce((sum, event) => sum + (event.nonfictionPages ?? 0), 0);
+    const pagesRaw = intFromText(parsed?.reading?.pagesText) ?? 0;
+    const fictionRaw = intFromText(parsed?.reading?.fictionPagesText) ?? 0;
+    const nonfictionRaw = intFromText(parsed?.reading?.nonfictionPagesText) ?? 0;
+    const fiction = fictionRaw || eventFiction;
+    const nonfiction = nonfictionRaw || eventNonfiction;
+    pagesWeekly += pagesRaw || eventPages || fiction + nonfiction;
   });
 
   const weeklyActuals = {
     workouts_logged_weekly: workoutsWeekly + (dataValue.workouts?.activities?.length ?? 0),
-    calls_weekly: intFromText(dataValue.community?.callsText) ?? callsWeekly,
+    calls_friends_weekly:
+      callsFriendsWeekly +
+      (intFromText(dataValue.community?.callsFriendsText) ??
+        intFromText(dataValue.community?.callsText) ??
+        0),
+    calls_family_weekly:
+      callsFamilyWeekly + (intFromText(dataValue.community?.callsFamilyText) ?? 0),
     social_events_weekly:
-      intFromText(dataValue.community?.socialEventsText) ?? socialWeekly,
+      socialWeekly + (intFromText(dataValue.community?.socialEventsText) ?? 0),
+    pages_weekly: pagesWeekly + (() => {
+      const events = dataValue.reading?.events ?? [];
+      const eventPages = events.reduce((sum, event) => sum + (event.pages ?? 0), 0);
+      const eventFiction = events.reduce((sum, event) => sum + (event.fictionPages ?? 0), 0);
+      const eventNonfiction = events.reduce((sum, event) => sum + (event.nonfictionPages ?? 0), 0);
+      const pagesRaw = intFromText(dataValue.reading?.pagesText) ?? 0;
+      const fictionRaw = intFromText(dataValue.reading?.fictionPagesText) ?? 0;
+      const nonfictionRaw = intFromText(dataValue.reading?.nonfictionPagesText) ?? 0;
+      const fiction = fictionRaw || eventFiction;
+      const nonfiction = nonfictionRaw || eventNonfiction;
+      return pagesRaw || eventPages || fiction + nonfiction;
+    })(),
   };
   const scores = computeScores(
     dataValue,

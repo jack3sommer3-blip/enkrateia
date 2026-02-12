@@ -22,11 +22,13 @@ function chipsFor(item: ActivityItem) {
     const minutes = Number(item.metadata?.minutes ?? 0);
     const seconds = Number(item.metadata?.seconds ?? 0);
     const intensity = Number(item.metadata?.intensity ?? 0);
+    const environment = String(item.metadata?.environment ?? "");
     if (minutes > 0 || seconds > 0) {
       const total = minutes > 0 ? `${minutes}m` : `${seconds}s`;
       chips.push({ label: "TIME", value: total });
     }
     if (intensity > 0) chips.push({ label: "INT", value: String(intensity) });
+    if (environment) chips.push({ label: "ENV", value: environment });
   }
   if (item.event_type === "reading") {
     const pages = Number(item.metadata?.pages ?? 0);

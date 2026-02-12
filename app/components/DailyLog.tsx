@@ -49,6 +49,8 @@ function makeEmptyDailyLog(): DayData {
     },
     community: {
       callsText: undefined,
+      callsFriendsText: undefined,
+      callsFamilyText: undefined,
       socialEventsText: undefined,
       note: undefined,
     },
@@ -224,6 +226,19 @@ function isValidReading(event: ReadingEvent) {
   return (total ?? 0) > 0 || !!event.title;
 }
 
+function totalPagesForDay(data: DayData) {
+  const events = data.reading.events ?? [];
+  const eventPages = events.reduce((sum, event) => sum + (event.pages ?? 0), 0);
+  const eventFiction = events.reduce((sum, event) => sum + (event.fictionPages ?? 0), 0);
+  const eventNonfiction = events.reduce((sum, event) => sum + (event.nonfictionPages ?? 0), 0);
+  const pagesRaw = intFromText(data.reading.pagesText) ?? 0;
+  const fictionRaw = intFromText(data.reading.fictionPagesText) ?? 0;
+  const nonfictionRaw = intFromText(data.reading.nonfictionPagesText) ?? 0;
+  const fiction = fictionRaw || eventFiction;
+  const nonfiction = nonfictionRaw || eventNonfiction;
+  return pagesRaw || eventPages || fiction + nonfiction;
+}
+
 function isValidDrinking(drinks: number) {
   return drinks > 0;
 }
@@ -248,9 +263,13 @@ function hasMeaningfulData(data: DayData, drinkingEvents: DrinkingEvent[]) {
   if (readingEvents.some(isValidReading)) return true;
   if (data.reading.title || (intFromText(data.reading.pagesText) ?? 0) > 0) return true;
 
-  const calls = intFromText(data.community?.callsText) ?? 0;
+  const calls =
+    intFromText(data.community?.callsFriendsText) ??
+    intFromText(data.community?.callsText) ??
+    0;
+  const callsFamily = intFromText(data.community?.callsFamilyText) ?? 0;
   const socialEvents = intFromText(data.community?.socialEventsText) ?? 0;
-  if (calls > 0 || socialEvents > 0) return true;
+  if (calls > 0 || callsFamily > 0 || socialEvents > 0) return true;
 
   if (drinkingEvents.some((event) => event.drinks > 0)) return true;
 
@@ -284,8 +303,10 @@ export default function DailyLog({
   const activeDateRef = useRef(dateKey);
   const [weeklyBase, setWeeklyBase] = useState({
     workouts_logged_weekly: 0,
-    calls_weekly: 0,
+    calls_friends_weekly: 0,
+    calls_family_weekly: 0,
     social_events_weekly: 0,
+    pages_weekly: 0,
   });
   const latestRef = useRef<{
     data: DayData;
@@ -302,6 +323,10 @@ export default function DailyLog({
   const [drinkingEditId, setDrinkingEditId] = useState<string | null>(null);
   const [exerciseOpen, setExerciseOpen] = useState(false);
   const [exerciseType, setExerciseType] = useState<ActivityType>("Weight Lifting");
+  const [exerciseEnvironment, setExerciseEnvironment] = useState<
+    "" | "indoor" | "outdoor"
+  >("");
+  const [exerciseError, setExerciseError] = useState<string | null>(null);
   const exerciseMinutesRef = useRef<HTMLInputElement | null>(null);
   const exerciseSecondsRef = useRef<HTMLInputElement | null>(null);
   const exerciseCaloriesRef = useRef<HTMLInputElement | null>(null);
@@ -388,6 +413,7 @@ export default function DailyLog({
                   (activity as WorkoutActivity & { intensity?: number }).intensity ??
                     activity.intensityText
                 ),
+                environment: activity.environment,
               })) ?? [],
           },
           sleep: {
@@ -525,25 +551,40 @@ export default function DailyLog({
         .lte("date", endKey);
       if (!mounted) return;
       if (error || !rows) {
-        setWeeklyBase({ workouts_logged_weekly: 0, calls_weekly: 0, social_events_weekly: 0 });
+        setWeeklyBase({
+          workouts_logged_weekly: 0,
+          calls_friends_weekly: 0,
+          calls_family_weekly: 0,
+          social_events_weekly: 0,
+          pages_weekly: 0,
+        });
         return;
       }
 
       let workouts = 0;
-      let calls = 0;
+      let callsFriends = 0;
+      let callsFamily = 0;
       let socials = 0;
+      let pages = 0;
       rows.forEach((row) => {
         if (row.date === dateKey) return;
         const parsed = row.data as DayData;
         workouts += parsed?.workouts?.activities?.length ?? 0;
-        calls += intFromText(parsed?.community?.callsText) ?? 0;
+        callsFriends +=
+          intFromText(parsed?.community?.callsFriendsText) ??
+          intFromText(parsed?.community?.callsText) ??
+          0;
+        callsFamily += intFromText(parsed?.community?.callsFamilyText) ?? 0;
         socials += intFromText(parsed?.community?.socialEventsText) ?? 0;
+        pages += totalPagesForDay(parsed);
       });
 
       setWeeklyBase({
         workouts_logged_weekly: workouts,
-        calls_weekly: calls,
+        calls_friends_weekly: callsFriends,
+        calls_family_weekly: callsFamily,
         social_events_weekly: socials,
+        pages_weekly: pages,
       });
     };
 
@@ -586,6 +627,8 @@ export default function DailyLog({
     if (!exerciseOpen) return;
     requestAnimationFrame(() => {
       setExerciseType("Weight Lifting");
+      setExerciseEnvironment("");
+      setExerciseError(null);
       if (exerciseMinutesRef.current) exerciseMinutesRef.current.value = "";
       if (exerciseSecondsRef.current) exerciseSecondsRef.current.value = "";
       if (exerciseCaloriesRef.current) exerciseCaloriesRef.current.value = "";
@@ -701,7 +744,7 @@ export default function DailyLog({
   const restaurantMeals = intFromText(data.diet.restaurantMealsText) ?? 0;
   const totalMeals = cookedMeals + restaurantMeals;
   const readingEvents = (data.reading.events ?? []) as ReadingEvent[];
-  const pagesRead = readingEvents.reduce((sum, event) => sum + (event.pages ?? 0), 0);
+  const pagesRead = totalPagesForDay(data);
   const fictionPages = readingEvents.reduce(
     (sum, event) => sum + (event.fictionPages ?? 0),
     0
@@ -713,16 +756,27 @@ export default function DailyLog({
   const weeklyActuals = useMemo(
     () => ({
       workouts_logged_weekly: weeklyBase.workouts_logged_weekly + data.workouts.activities.length,
-      calls_weekly:
-        intFromText(data.community?.callsText) ?? weeklyBase.calls_weekly,
+      calls_friends_weekly:
+        weeklyBase.calls_friends_weekly +
+        (intFromText(data.community?.callsFriendsText) ??
+          intFromText(data.community?.callsText) ??
+          0),
+      calls_family_weekly:
+        weeklyBase.calls_family_weekly +
+        (intFromText(data.community?.callsFamilyText) ?? 0),
       social_events_weekly:
-        intFromText(data.community?.socialEventsText) ?? weeklyBase.social_events_weekly,
+        weeklyBase.social_events_weekly +
+        (intFromText(data.community?.socialEventsText) ?? 0),
+      pages_weekly: weeklyBase.pages_weekly + totalPagesForDay(data),
     }),
     [
       weeklyBase,
       data.workouts.activities.length,
+      data.community?.callsFriendsText,
+      data.community?.callsFamilyText,
       data.community?.callsText,
       data.community?.socialEventsText,
+      data.reading,
     ]
   );
   const scores = computeScores(data, goals, drinkingEvents, weeklyActuals);
@@ -867,6 +921,37 @@ export default function DailyLog({
                       </Select>
                     </div>
                     <div>
+                      <Label>Environment</Label>
+                      <div className="flex items-center gap-2">
+                        {(["indoor", "outdoor"] as const).map((value) => (
+                          <button
+                            key={value}
+                            onClick={() => {
+                              setExerciseEnvironment(value);
+                              if (exerciseError) setExerciseError(null);
+                            }}
+                            className={[
+                              "px-3 py-2 rounded-full border text-sm transition",
+                              exerciseEnvironment === value
+                                ? "border-[color:var(--accent-60)] text-[color:var(--accent)] bg-[color:var(--accent-10)]"
+                                : "border-white/10 text-gray-400 hover:border-white/20",
+                            ].join(" ")}
+                          >
+                            {value === "indoor" ? "Indoor" : "Outdoor"}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => {
+                            setExerciseEnvironment("");
+                            if (exerciseError) setExerciseError(null);
+                          }}
+                          className="px-3 py-2 rounded-full border border-white/10 text-gray-400 hover:border-white/20 text-sm"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div>
                       <Label>Minutes</Label>
                       <Input
                         inputMode="numeric"
@@ -910,6 +995,11 @@ export default function DailyLog({
                         const seconds = exerciseSecondsRef.current?.value ?? "";
                         const calories = exerciseCaloriesRef.current?.value ?? "";
                         const intensity = exerciseIntensityRef.current?.value ?? "";
+                        const requiresEnvironment = goals.presetId === "75-hard";
+                        if (requiresEnvironment && !exerciseEnvironment) {
+                          setExerciseError("Select indoor or outdoor for 75 Hard.");
+                          return;
+                        }
                         const workoutId = id();
                         const loggedAt = new Date().toISOString();
                         const newWorkout: WorkoutActivity = {
@@ -919,6 +1009,7 @@ export default function DailyLog({
                           secondsText: seconds,
                           caloriesText: calories,
                           intensityText: intensity,
+                          environment: exerciseEnvironment || undefined,
                           loggedAt,
                         };
                         setData((prev) => ({
@@ -934,6 +1025,7 @@ export default function DailyLog({
                         if (isValidWorkout(newWorkout)) {
                           const summaryParts = [
                             exerciseType,
+                            exerciseEnvironment ? exerciseEnvironment : undefined,
                             minutes ? `${minutes} min` : undefined,
                             intensity ? `Intensity ${intensity}` : undefined,
                           ].filter(Boolean);
@@ -949,6 +1041,7 @@ export default function DailyLog({
                               seconds,
                               calories,
                               intensity,
+                              environment: exerciseEnvironment || undefined,
                             },
                           });
                         }
@@ -957,6 +1050,7 @@ export default function DailyLog({
                         if (exerciseCaloriesRef.current) exerciseCaloriesRef.current.value = "";
                         if (exerciseIntensityRef.current)
                           exerciseIntensityRef.current.value = "";
+                        if (exerciseError) setExerciseError(null);
                         setExerciseOpen(false);
                       }}
                       className="px-4 py-2 rounded-md border border-[color:var(--accent-40)] text-[color:var(--accent)] hover:border-[color:var(--accent-60)] transition"
@@ -970,6 +1064,9 @@ export default function DailyLog({
                       Cancel
                     </button>
                   </div>
+                  {exerciseError ? (
+                    <div className="mt-3 text-sm text-rose-300">{exerciseError}</div>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -993,6 +1090,7 @@ export default function DailyLog({
                           : "No time logged"}
                         {a.caloriesText ? ` • ${a.caloriesText} cal` : ""}
                         {a.intensityText ? ` • Intensity ${a.intensityText}` : ""}
+                        {a.environment ? ` • ${a.environment}` : ""}
                       </div>
                     </div>
                     <button
@@ -1170,7 +1268,7 @@ export default function DailyLog({
           <Card
             title="Community"
             subtitle="Connection and social presence. Weekly targets count toward your score."
-            hint={`Calls (weekly): ${weeklyActuals.calls_weekly}  •  Social events (weekly): ${weeklyActuals.social_events_weekly}  •  Score: ${formatScore(
+            hint={`Friend calls: ${weeklyActuals.calls_friends_weekly}  •  Family calls: ${weeklyActuals.calls_family_weekly}  •  Social events: ${weeklyActuals.social_events_weekly}  •  Score: ${formatScore(
               scores.communityScore
             )}/25`}
             earned={scores.communityScore >= 25}
@@ -1178,23 +1276,39 @@ export default function DailyLog({
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Calls to friends/family (this week)</Label>
+                <Label>Friend calls (Mon–Sun)</Label>
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 1"
                   isFutureDate={isFutureDate}
-                  value={data.community?.callsText ?? ""}
+                  value={data.community?.callsFriendsText ?? ""}
                   onChange={(e) => {
                     const value = e.currentTarget.value;
                     setData((prev) => ({
                       ...prev,
-                      community: { ...(prev.community ?? {}), callsText: value },
+                      community: { ...(prev.community ?? {}), callsFriendsText: value },
                     }));
                   }}
                 />
               </div>
               <div>
-                <Label>Social events attended (this week)</Label>
+                <Label>Family calls (Mon–Sun)</Label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="e.g., 1"
+                  isFutureDate={isFutureDate}
+                  value={data.community?.callsFamilyText ?? ""}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value;
+                    setData((prev) => ({
+                      ...prev,
+                      community: { ...(prev.community ?? {}), callsFamilyText: value },
+                    }));
+                  }}
+                />
+              </div>
+              <div>
+                <Label>Social events attended (Mon–Sun)</Label>
                 <Input
                   inputMode="numeric"
                   placeholder="e.g., 1"

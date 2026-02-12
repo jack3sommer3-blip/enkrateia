@@ -14,6 +14,7 @@ export type WorkoutActivity = {
   secondsText?: string;
   caloriesText?: string;
   intensityText?: string; // 1–9
+  environment?: "indoor" | "outdoor";
   loggedAt?: string; // ISO timestamp
 };
 
@@ -44,6 +45,8 @@ export type DayData = {
   };
   community?: {
     callsText?: string;
+    callsFriendsText?: string;
+    callsFamilyText?: string;
     socialEventsText?: string;
     note?: string;
   };

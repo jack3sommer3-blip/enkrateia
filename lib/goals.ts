@@ -36,7 +36,8 @@ const DEFAULT_GOALS: Goals = {
   community: {
     enabled: [],
     targets: {
-      calls_weekly: 1,
+      calls_friends_weekly: 1,
+      calls_family_weekly: 1,
       social_events_weekly: 1,
     },
   },
@@ -49,13 +50,15 @@ export const GOAL_BOUNDS: Record<string, { min: number; max: number }> = {
   workouts_logged: { min: 1, max: 10 },
   workouts_logged_weekly: { min: 1, max: 20 },
   hours: { min: 1, max: 16 },
-  meals_cooked_percent: { min: 1, max: 100 },
+  meals_cooked_percent: { min: 0, max: 100 },
   healthiness_self_rating: { min: 1, max: 10 },
   protein_grams: { min: 1, max: 400 },
   pages: { min: 1, max: 500 },
   fiction_pages: { min: 1, max: 500 },
   nonfiction_pages: { min: 1, max: 500 },
-  calls_weekly: { min: 0, max: 14 },
+  pages_weekly: { min: 1, max: 5000 },
+  calls_friends_weekly: { min: 0, max: 14 },
+  calls_family_weekly: { min: 0, max: 14 },
   social_events_weekly: { min: 0, max: 14 },
 };
 
@@ -176,7 +179,7 @@ export const GOAL_PRESETS: GoalPreset[] = [
     name: "75 Hard",
     description: "Two workouts, strict diet, daily reading, and recovery targets.",
     notes: [
-      "Outdoor workout, water intake, and progress photo are not tracked yet.",
+      "Water intake and progress photo are not tracked yet.",
     ],
     config: {
       enabledCategories: ["exercise", "diet", "reading", "sleep"],
@@ -200,7 +203,7 @@ export const GOAL_PRESETS: GoalPreset[] = [
         },
         community: {
           enabled: [],
-          targets: { calls_weekly: 1, social_events_weekly: 1 },
+          targets: { calls_friends_weekly: 1, calls_family_weekly: 1, social_events_weekly: 1 },
         },
       },
       presetId: "75-hard",
@@ -231,8 +234,8 @@ export const GOAL_PRESETS: GoalPreset[] = [
           targets: { hours: 7.5 },
         },
         community: {
-          enabled: ["calls_weekly", "social_events_weekly"],
-          targets: { calls_weekly: 1, social_events_weekly: 1 },
+          enabled: ["calls_friends_weekly", "calls_family_weekly", "social_events_weekly"],
+          targets: { calls_friends_weekly: 1, calls_family_weekly: 1, social_events_weekly: 1 },
         },
       },
       presetId: "75-soft",
@@ -240,66 +243,34 @@ export const GOAL_PRESETS: GoalPreset[] = [
   },
   {
     id: "jacks-standard",
-    name: "Jack’s Standard",
-    description: "High-output daily baseline with knowledge and community focus.",
+    name: "Jack’s targets",
+    description: "Jack’s current targets across training, sleep, diet, knowledge.",
     config: {
       enabledCategories: ["exercise", "sleep", "diet", "reading", "community"],
       categories: {
         ...getDefaultGoals(),
         exercise: {
           enabled: ["minutes", "steps"],
-          targets: { minutes: 60, steps: 9000 },
+          targets: { minutes: 60, steps: 10000 },
         },
         diet: {
-          enabled: ["meals_cooked_percent"],
-          targets: { meals_cooked_percent: 90 },
+          enabled: ["healthiness_self_rating"],
+          targets: { healthiness_self_rating: 9 },
         },
         reading: {
           enabled: ["pages"],
-          targets: { pages: 20 },
-        },
-        sleep: {
-          enabled: ["hours"],
-          targets: { hours: 7.5 },
-        },
-        community: {
-          enabled: ["calls_weekly"],
-          targets: { calls_weekly: 1, social_events_weekly: 1 },
-        },
-      },
-      presetId: "jacks-standard",
-    },
-  },
-  {
-    id: "operator-baseline",
-    name: "Operator Baseline",
-    description: "Performance-focused conditioning and recovery.",
-    config: {
-      enabledCategories: ["exercise", "sleep", "diet"],
-      categories: {
-        ...getDefaultGoals(),
-        exercise: {
-          enabled: ["minutes", "calories_burned", "workouts_logged"],
-          targets: { minutes: 75, calories_burned: 700, workouts_logged: 1 },
-        },
-        diet: {
-          enabled: ["meals_cooked_percent", "protein_grams"],
-          targets: { meals_cooked_percent: 90, protein_grams: 160 },
+          targets: { pages: 25 },
         },
         sleep: {
           enabled: ["hours"],
           targets: { hours: 8 },
         },
-        reading: {
-          enabled: [],
-          targets: { pages: 10 },
-        },
         community: {
           enabled: [],
-          targets: { calls_weekly: 1, social_events_weekly: 1 },
+          targets: { calls_friends_weekly: 1, calls_family_weekly: 1, social_events_weekly: 1 },
         },
       },
-      presetId: "operator-baseline",
+      presetId: "jacks-standard",
     },
   },
   {
@@ -328,7 +299,7 @@ export const GOAL_PRESETS: GoalPreset[] = [
         },
         community: {
           enabled: [],
-          targets: { calls_weekly: 1, social_events_weekly: 1 },
+          targets: { calls_friends_weekly: 1, calls_family_weekly: 1, social_events_weekly: 1 },
         },
       },
       presetId: "scholars-track",
@@ -341,49 +312,66 @@ export function getPresetConfig(presetId: string): GoalConfig {
   return preset ? normalizeGoalConfig(preset.config) : getDefaultGoalConfig();
 }
 
-export type GoalOption = { key: string; label: string; hint: string };
+export type GoalOption = {
+  key: string;
+  label: string;
+  hint: string;
+  cadence: "daily" | "weekly";
+};
 
 export const GOAL_OPTIONS: Record<GoalCategoryKey, GoalOption[]> = {
   exercise: [
-    { key: "minutes", label: "Minutes", hint: "Total exercise minutes" },
-    { key: "calories_burned", label: "Calories", hint: "Calories burned" },
-    { key: "steps", label: "Steps", hint: "Daily steps" },
-    { key: "workouts_logged", label: "Workouts logged", hint: "Count of workouts" },
+    { key: "minutes", label: "Minutes", hint: "Total exercise minutes", cadence: "daily" },
+    { key: "calories_burned", label: "Calories", hint: "Calories burned", cadence: "daily" },
+    { key: "steps", label: "Steps", hint: "Daily steps", cadence: "daily" },
+    { key: "workouts_logged", label: "Workouts logged", hint: "Count of workouts", cadence: "daily" },
     {
       key: "workouts_logged_weekly",
       label: "Workouts (weekly)",
       hint: "Total workouts per week",
+      cadence: "weekly",
     },
   ],
-  sleep: [{ key: "hours", label: "Hours", hint: "Total sleep hours" }],
+  sleep: [{ key: "hours", label: "Hours", hint: "Total sleep hours", cadence: "daily" }],
   diet: [
     {
       key: "meals_cooked_percent",
       label: "Cooked meals %",
       hint: "Percent of meals cooked at home",
+      cadence: "daily",
     },
     {
       key: "healthiness_self_rating",
       label: "Healthiness (1–10)",
       hint: "Self rating",
+      cadence: "daily",
     },
-    { key: "protein_grams", label: "Protein grams", hint: "Daily protein" },
+    { key: "protein_grams", label: "Protein grams", hint: "Daily protein", cadence: "daily" },
   ],
   reading: [
-    { key: "pages", label: "Pages", hint: "Total pages read" },
-    { key: "fiction_pages", label: "Fiction pages", hint: "Fiction only" },
-    { key: "nonfiction_pages", label: "Non-fiction pages", hint: "Non-fiction only" },
+    { key: "pages", label: "Pages", hint: "Total pages read", cadence: "daily" },
+    { key: "pages_weekly", label: "Pages (weekly)", hint: "Total pages per week", cadence: "weekly" },
+    { key: "fiction_pages", label: "Fiction pages", hint: "Fiction only", cadence: "daily" },
+    { key: "nonfiction_pages", label: "Non-fiction pages", hint: "Non-fiction only", cadence: "daily" },
   ],
   community: [
     {
-      key: "calls_weekly",
-      label: "Calls (weekly)",
-      hint: "Calls to friends or family per week",
+      key: "calls_friends_weekly",
+      label: "Friend calls (weekly)",
+      hint: "Calls to friends per week",
+      cadence: "weekly",
+    },
+    {
+      key: "calls_family_weekly",
+      label: "Family calls (weekly)",
+      hint: "Calls to family per week",
+      cadence: "weekly",
     },
     {
       key: "social_events_weekly",
       label: "Social events (weekly)",
       hint: "Social events attended per week",
+      cadence: "weekly",
     },
   ],
 };
