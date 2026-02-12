@@ -15,7 +15,7 @@ import {
   getPresetConfig,
 } from "@/lib/goals";
 import type { GoalConfig, GoalCategoryKey } from "@/lib/types";
-import { clampInt } from "@/lib/utils";
+import { clampInt, parseOptionalInt } from "@/lib/utils";
 
 export default function GoalsPage() {
   const router = useRouter();
@@ -80,12 +80,26 @@ export default function GoalsPage() {
 
   const commitTarget = (category: GoalCategoryKey, key: string, raw: string) => {
     const bounds = GOAL_BOUNDS[key];
-    const n = Number(raw);
-    const fallback = Number.isFinite(n) ? n : 0;
-    const clamped = bounds
-      ? clampInt(Math.round(fallback), bounds.min, bounds.max)
-      : fallback;
-    updateTarget(category, key, String(clamped));
+    const parsed = parseOptionalInt(raw);
+    if (parsed === null) {
+      setGoalConfig((prev) => {
+        const next = {
+          ...prev,
+          categories: {
+            ...prev.categories,
+            [category]: {
+              ...prev.categories[category],
+              targets: { ...prev.categories[category].targets },
+            },
+          },
+        };
+        delete next.categories[category].targets[key];
+        return next;
+      });
+    } else {
+      const clamped = bounds ? clampInt(parsed, bounds.min, bounds.max) : parsed;
+      updateTarget(category, key, String(clamped));
+    }
     setTargetEdits((prev) => {
       const next = { ...prev };
       delete next[targetKey(category, key)];
@@ -168,7 +182,8 @@ export default function GoalsPage() {
       }
       for (const key of goalConfig.categories[category].enabled) {
         const value = goalConfig.categories[category].targets[key];
-        if (value == null || Number.isNaN(value) || value < 0) {
+        if (value == null) continue;
+        if (Number.isNaN(value) || value < 0) {
           return `Target for ${key.replaceAll("_", " ")} must be 0 or higher.`;
         }
       }
@@ -317,11 +332,19 @@ export default function GoalsPage() {
                               onChange={(e) =>
                                 setTargetEdits((prev) => ({
                                   ...prev,
-                                  [targetKey(category, option.key)]: e.currentTarget.value,
+                                  [targetKey(category, option.key)]: e.currentTarget.value.replace(
+                                    /[^\d]/g,
+                                    ""
+                                  ),
                                 }))
                               }
-                              onBlur={(e) =>
-                                commitTarget(category, option.key, e.currentTarget.value)
+                              onBlur={() =>
+                                commitTarget(
+                                  category,
+                                  option.key,
+                                  targetEdits[targetKey(category, option.key)] ??
+                                    getTargetInputValue(category, option.key)
+                                )
                               }
                               className="w-full max-w-[180px] px-3 py-1.5 rounded-md bg-black border border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-white/10 disabled:opacity-40"
                             />

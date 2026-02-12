@@ -17,6 +17,14 @@ export function intFromText(value?: string): number | undefined {
   return Math.trunc(n);
 }
 
+export function parseOptionalInt(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const n = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(n)) return null;
+  return n;
+}
+
 export function formatScore(n: number) {
   if (!Number.isFinite(n)) return "0";
   const fixed = n.toFixed(1);

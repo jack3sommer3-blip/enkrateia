@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.clampInt = clampInt;
 exports.numFromText = numFromText;
 exports.intFromText = intFromText;
+exports.parseOptionalInt = parseOptionalInt;
 exports.formatScore = formatScore;
 exports.normalizeIntText = normalizeIntText;
 exports.textFromUnknown = textFromUnknown;
@@ -31,6 +32,15 @@ function intFromText(value) {
     if (n === undefined)
         return undefined;
     return Math.trunc(n);
+}
+function parseOptionalInt(value) {
+    const trimmed = value.trim();
+    if (!trimmed)
+        return null;
+    const n = Number.parseInt(trimmed, 10);
+    if (!Number.isFinite(n))
+        return null;
+    return n;
 }
 function formatScore(n) {
     if (!Number.isFinite(n))

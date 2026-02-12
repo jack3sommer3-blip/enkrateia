@@ -42,11 +42,7 @@ const DEFAULT_GOALS = {
     },
     community: {
         enabled: [],
-        targets: {
-            calls_friends_weekly: 1,
-            calls_family_weekly: 1,
-            social_events_weekly: 1,
-        },
+        targets: {},
     },
 };
 exports.GOAL_BOUNDS = {
@@ -364,17 +360,24 @@ function computeCategoryScore(actuals, goals, fallback) {
     if (!enabled.length)
         return 0;
     let total = 0;
+    let counted = 0;
     enabled.forEach((key) => {
         const actual = actuals[key] ?? 0;
-        const target = targets[key] ?? 0;
-        if (!target || target <= 0) {
-            total += 0;
+        const target = targets[key];
+        if (typeof target !== "number" || !Number.isFinite(target) || target <= 0) {
+            if (process.env.NODE_ENV !== "production" && Number.isNaN(target)) {
+                console.warn("[goals] NaN target for", key);
+            }
+            return;
         }
-        else {
-            total += Math.min(actual / target, 1);
+        if (process.env.NODE_ENV !== "production" && !Number.isFinite(actual)) {
+            console.warn("[goals] NaN actual for", key);
+            return;
         }
+        total += Math.min(actual / target, 1);
+        counted += 1;
     });
-    return total / enabled.length;
+    return counted ? total / counted : 0;
 }
 function runGoalsSelfTest() {
     const goals = getDefaultGoals();
