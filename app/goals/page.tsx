@@ -329,15 +329,14 @@ export default function GoalsPage() {
                                   ? getTargetInputValue(category, option.key)
                                   : ""
                               }
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const raw =
+                                  e.target instanceof HTMLInputElement ? e.target.value : "";
                                 setTargetEdits((prev) => ({
                                   ...prev,
-                                  [targetKey(category, option.key)]: e.currentTarget.value.replace(
-                                    /[^\d]/g,
-                                    ""
-                                  ),
-                                }))
-                              }
+                                  [targetKey(category, option.key)]: raw.replace(/[^\d]/g, ""),
+                                }));
+                              }}
                               onBlur={() =>
                                 commitTarget(
                                   category,

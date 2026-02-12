@@ -90,10 +90,11 @@ function normalizeGoals(input) {
             return;
         if (Array.isArray(incoming.enabled)) {
             const cleaned = incoming.enabled.filter(Boolean);
-            if (category === "community" && cleaned.includes("calls_weekly")) {
-                base[category].enabled = cleaned
+            if (category === "community") {
+                const normalized = cleaned
                     .filter((key) => key !== "calls_weekly")
-                    .concat("calls_friends_weekly");
+                    .concat(cleaned.includes("calls_weekly") ? ["calls_friends_weekly"] : []);
+                base[category].enabled = normalized;
             }
             else {
                 base[category].enabled = cleaned;
@@ -104,6 +105,9 @@ function normalizeGoals(input) {
                 if (typeof value !== "number" || !Number.isFinite(value))
                     return;
                 if (category === "community" && key === "calls_weekly") {
+                    const enabled = base[category].enabled ?? [];
+                    if (!enabled.includes("calls_friends_weekly"))
+                        return;
                     if (base[category].targets.calls_friends_weekly === undefined) {
                         base[category].targets.calls_friends_weekly = clampTarget("calls_friends_weekly", value);
                     }
