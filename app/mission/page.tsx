@@ -32,7 +32,6 @@ export default function MissionPage() {
           </div>
 
           <div className="text-gray-300">
-            <div className="font-semibold text-white">-Jack Sommer</div>
             <div>@jack</div>
           </div>
 

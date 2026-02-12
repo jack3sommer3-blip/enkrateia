@@ -135,7 +135,6 @@ const Card = ({ title, subtitle, children, earned, hint, score }: CardProps) => 
     <div className="flex items-start justify-between gap-4">
       <div>
         <div className="text-xl font-semibold">{title}</div>
-        <div className="text-gray-400 mt-1">{subtitle}</div>
         {hint ? <div className="text-gray-500 mt-2 text-sm">{hint}</div> : null}
       </div>
       <div className="shrink-0">
