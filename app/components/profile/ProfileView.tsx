@@ -346,7 +346,10 @@ export default function ProfileView({
                           <div className="text-sm">?</div>
                         )}
                       </div>
-                      <div className="text-[10px] leading-tight text-center">
+                      <div
+                        className="text-[10px] leading-none text-center tracking-[0.15em] font-semibold [font-variant-numeric:tabular-nums]"
+                        style={{ transform: "none" }}
+                      >
                         {label}
                       </div>
                     </button>
