@@ -9,7 +9,7 @@ export const BADGE_007: Badge = {
   name: "007",
   description:
     "James Bond is the ultimate operator. This badge is earned by logging 7 days in a row. You are still early on your journey, but you are on the right track. Perhaps a vesper martini to celebrate? Shaken, of course.",
-  icon_key: "007",
+  icon_key: "/badges/007.png",
 };
 
 type DailyLogRow = {

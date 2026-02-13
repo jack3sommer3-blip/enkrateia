@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import StoryLoading from "@/app/components/StoryLoading";
 import ActivityPost from "@/app/components/social/ActivityPost";
 import {
@@ -321,6 +322,7 @@ export default function ProfileView({
               <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(88px,1fr))]">
                 {badges.map((badge) => {
                   const label = badge.badges?.name ?? badge.badge_id;
+                  const iconSrc = badge.badges?.icon_key ?? null;
                   const isBond007 = badge.badges?.id === "bond_007";
                   return (
                     <button
@@ -339,11 +341,14 @@ export default function ProfileView({
                         "active:scale-[0.98]",
                       ].join(" ")}
                     >
-                      {isBond007 ? (
-                        <img
-                          src="/badges/007.svg"
+                      {isBond007 && iconSrc ? (
+                        <Image
+                          src={iconSrc}
                           alt="007 badge"
-                          className="w-16 h-16 text-white"
+                          width={96}
+                          height={96}
+                          className="w-16 h-16 object-contain"
+                          unoptimized
                         />
                       ) : (
                         <div className="w-16 h-16 rounded-full border border-white/20 bg-transparent flex items-center justify-center group-hover:border-white/40 group-hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]">
