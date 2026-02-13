@@ -339,9 +339,9 @@ export default function ProfileView({
                         "active:scale-[0.98]",
                       ].join(" ")}
                     >
-                      <div className="w-12 h-12 rounded-full border border-white/20 bg-transparent flex items-center justify-center group-hover:border-white/40 group-hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]">
+                      <div className="w-16 h-16 rounded-full border border-white/20 bg-transparent flex items-center justify-center group-hover:border-white/40 group-hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]">
                         {badge.badges?.id === "bond_007" ? (
-                          <Badge007 className="w-9 h-9" />
+                          <Badge007 className="w-12 h-6" />
                         ) : (
                           <div className="text-sm">?</div>
                         )}
