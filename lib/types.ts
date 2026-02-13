@@ -182,7 +182,7 @@ export type Badge = {
   id: string;
   name: string;
   description: string;
-  icon_key?: string | null;
+  icon_key: string | null;
   created_at?: string | null;
 };
 
@@ -191,5 +191,5 @@ export type UserBadge = {
   user_id: string;
   badge_id: string;
   earned_at: string;
-  badges?: Badge;
+  badges: Badge;
 };

@@ -71,12 +71,35 @@ export async function checkAndAward007Badge(userId: string) {
 }
 
 export async function getUserBadges(userId: string) {
+  type UserBadgeRow = {
+    id: string;
+    user_id: string;
+    badge_id: string;
+    earned_at: string;
+    badges: Badge | Badge[] | null;
+  };
+
   const { data, error } = await supabase
     .from("user_badges")
-    .select("id, user_id, badge_id, earned_at, badges(id, name, description, icon_key)")
+    .select(
+      "id, user_id, badge_id, earned_at, badges!user_badges_badge_id_fkey(id, name, description, icon_key)"
+    )
     .eq("user_id", userId)
     .order("earned_at", { ascending: false });
 
-  if (error) return [] as UserBadge[];
-  return (data ?? []) as UserBadge[];
+  if (error || !data) return [];
+
+  return (data as UserBadgeRow[])
+    .map((row) => {
+      const badge = Array.isArray(row.badges) ? row.badges[0] : row.badges;
+      if (!badge) return null;
+      return {
+        id: row.id,
+        user_id: row.user_id,
+        badge_id: row.badge_id,
+        earned_at: row.earned_at,
+        badges: badge,
+      } as UserBadge;
+    })
+    .filter((row): row is UserBadge => Boolean(row));
 }
