@@ -12,5 +12,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["goal-logic.test.ts", "../lib/**/*.ts"]
+  "include": ["goal-logic.test.ts", "badges.test.ts", "../lib/**/*.ts"]
 }

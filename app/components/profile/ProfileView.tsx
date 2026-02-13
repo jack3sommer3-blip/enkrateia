@@ -16,7 +16,7 @@ import {
   getProfileByUsername,
   getCommentCounts,
 } from "@/lib/social";
-import { getUserBadges } from "@/lib/badges";
+import { checkAndAward007Badge, getUserBadges } from "@/lib/badges";
 import type { ActivityItem, Comment, Like, Profile, UserBadge } from "@/lib/types";
 
 type ProfileViewProps = {
@@ -112,6 +112,9 @@ export default function ProfileView({
   useEffect(() => {
     if (!profile?.id) return;
     let active = true;
+    if (viewerId && viewerId === profile.id) {
+      checkAndAward007Badge(viewerId);
+    }
     getUserBadges(profile.id).then((rows) => {
       if (!active) return;
       setBadges(rows);
