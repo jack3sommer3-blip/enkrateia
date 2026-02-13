@@ -324,6 +324,9 @@ export default function ProfileView({
                   const label = badge.badges?.name ?? badge.badge_id;
                   const iconSrc = badge.badges?.icon_key ?? null;
                   const isBond007 = badge.badges?.id === "bond_007";
+                  if (process.env.NODE_ENV !== "production" && isBond007) {
+                    console.debug("[BadgeIcon] 007 src", iconSrc);
+                  }
                   return (
                     <button
                       key={badge.id}
@@ -345,8 +348,8 @@ export default function ProfileView({
                         <Image
                           src={iconSrc}
                           alt="007 badge"
-                          width={96}
-                          height={96}
+                          width={88}
+                          height={88}
                           className="w-16 h-16 object-contain"
                           unoptimized
                         />
