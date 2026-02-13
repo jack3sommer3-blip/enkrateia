@@ -315,27 +315,44 @@ export default function ProfileView({
           <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
             Badges
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-4">
+          <div className="mt-4">
             {badges.length === 0 ? (
-              <div className="text-gray-500 text-sm col-span-3">No badges yet.</div>
+              <div className="text-gray-500 text-sm">No badges yet.</div>
             ) : (
-              badges.map((badge) => (
-                <button
-                  key={badge.id}
-                  type="button"
-                  onClick={() => setActiveBadge(badge)}
-                  className="flex flex-col items-center gap-2 text-xs text-gray-300 hover:text-white transition"
-                >
-                  <div className="w-14 h-14 rounded-full border border-white/10 bg-black/40 flex items-center justify-center">
-                    {badge.badges?.id === "bond_007" ? (
-                      <Badge007 className="w-10 h-10" />
-                    ) : (
-                      <div className="text-sm">?</div>
-                    )}
-                  </div>
-                  <div>{badge.badges?.name ?? badge.badge_id}</div>
-                </button>
-              ))
+              <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(88px,1fr))]">
+                {badges.map((badge) => {
+                  const label = badge.badges?.name ?? badge.badge_id;
+                  return (
+                    <button
+                      key={badge.id}
+                      type="button"
+                      onClick={() => setActiveBadge(badge)}
+                      aria-label={`View badge: ${label}`}
+                      title={`View badge: ${label}`}
+                      className={[
+                        "group w-full aspect-square rounded-md border border-white/10",
+                        "bg-gradient-to-br from-black/60 to-black/30",
+                        "flex flex-col items-center justify-center gap-2 px-2 py-3",
+                        "text-[11px] uppercase tracking-[0.2em] text-gray-400",
+                        "transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                        "hover:border-white/20 hover:text-white",
+                        "active:scale-[0.98]",
+                      ].join(" ")}
+                    >
+                      <div className="w-12 h-12 rounded-full border border-white/10 bg-black/40 flex items-center justify-center group-hover:border-white/25 group-hover:shadow-[0_0_18px_rgba(255,255,255,0.08)]">
+                        {badge.badges?.id === "bond_007" ? (
+                          <Badge007 className="w-9 h-9" />
+                        ) : (
+                          <div className="text-sm">?</div>
+                        )}
+                      </div>
+                      <div className="text-[10px] leading-tight text-center">
+                        {label}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
           {activeBadge ? (
