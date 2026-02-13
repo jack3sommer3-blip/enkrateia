@@ -177,3 +177,19 @@ export type Comment = {
     profile_photo_url?: string | null;
   };
 };
+
+export type Badge = {
+  id: string;
+  name: string;
+  description: string;
+  icon_key?: string | null;
+  created_at?: string | null;
+};
+
+export type UserBadge = {
+  id: string;
+  user_id: string;
+  badge_id: string;
+  earned_at: string;
+  badges?: Badge;
+};

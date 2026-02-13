@@ -31,9 +31,7 @@ export default function MissionPage() {
             </p>
           </div>
 
-          <div className="text-gray-300">
-            <div>@jack</div>
-          </div>
+          <div className="text-gray-300" />
 
           <div className="pt-4 border-t border-white/10">
             <div className="text-sm uppercase tracking-[0.2em] text-gray-500">

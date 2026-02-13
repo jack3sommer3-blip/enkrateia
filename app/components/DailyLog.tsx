@@ -18,6 +18,7 @@ import {
   updateDrinkingEvent,
 } from "@/lib/drinking";
 import { deleteFeedItemByEvent, upsertFeedItem, updateFeedItemByEvent } from "@/lib/social";
+import { checkAndAward007Badge } from "@/lib/badges";
 import {
   clampInt,
   formatScore,
@@ -500,6 +501,7 @@ export default function DailyLog({
     } else {
       setSaveError(null);
       dirtyRef.current = false;
+      checkAndAward007Badge(userId);
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("daily-log-saved", {

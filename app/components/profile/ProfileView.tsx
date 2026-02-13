@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import StoryLoading from "@/app/components/StoryLoading";
 import ActivityPost from "@/app/components/social/ActivityPost";
+import Badge007 from "@/app/components/badges/Badge007";
 import {
   addComment,
   deleteComment,
@@ -15,7 +16,8 @@ import {
   getProfileByUsername,
   getCommentCounts,
 } from "@/lib/social";
-import type { ActivityItem, Comment, Like, Profile } from "@/lib/types";
+import { getUserBadges } from "@/lib/badges";
+import type { ActivityItem, Comment, Like, Profile, UserBadge } from "@/lib/types";
 
 type ProfileViewProps = {
   username?: string;
@@ -37,6 +39,8 @@ export default function ProfileView({
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [badges, setBadges] = useState<UserBadge[]>([]);
+  const [activeBadge, setActiveBadge] = useState<UserBadge | null>(null);
   const debugEnabled = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("debug") === "1"
     : false;
@@ -104,6 +108,18 @@ export default function ProfileView({
       loadingRef.current = false;
     };
   }, [profile?.id, viewerId]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let active = true;
+    getUserBadges(profile.id).then((rows) => {
+      if (!active) return;
+      setBadges(rows);
+    });
+    return () => {
+      active = false;
+    };
+  }, [profile?.id]);
 
   const displayName = useMemo(() => {
     if (!profile) return "";
@@ -296,7 +312,46 @@ export default function ProfileView({
           <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
             Badges
           </div>
-          <div className="mt-4 text-gray-500">Badges coming soon.</div>
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            {badges.length === 0 ? (
+              <div className="text-gray-500 text-sm col-span-3">No badges yet.</div>
+            ) : (
+              badges.map((badge) => (
+                <button
+                  key={badge.id}
+                  type="button"
+                  onClick={() => setActiveBadge(badge)}
+                  className="flex flex-col items-center gap-2 text-xs text-gray-300 hover:text-white transition"
+                >
+                  <div className="w-14 h-14 rounded-full border border-white/10 bg-black/40 flex items-center justify-center">
+                    {badge.badges?.id === "bond_007" ? (
+                      <Badge007 className="w-10 h-10" />
+                    ) : (
+                      <div className="text-sm">?</div>
+                    )}
+                  </div>
+                  <div>{badge.badges?.name ?? badge.badge_id}</div>
+                </button>
+              ))
+            )}
+          </div>
+          {activeBadge ? (
+            <div className="mt-4 rounded-md border border-white/10 bg-black/40 p-4 text-sm text-gray-300">
+              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
+                {activeBadge.badges?.name ?? "Badge"}
+              </div>
+              <div className="mt-2">
+                {activeBadge.badges?.description ?? "Badge unlocked."}
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveBadge(null)}
+                className="mt-3 text-xs uppercase tracking-[0.2em] text-gray-400 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
