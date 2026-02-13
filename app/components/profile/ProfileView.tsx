@@ -330,16 +330,16 @@ export default function ProfileView({
                       aria-label={`View badge: ${label}`}
                       title={`View badge: ${label}`}
                       className={[
-                        "group w-full aspect-square rounded-md border border-white/10",
-                        "bg-gradient-to-br from-black/60 to-black/30",
+                        "group w-full aspect-square rounded-md border border-transparent",
+                        "bg-transparent",
                         "flex flex-col items-center justify-center gap-2 px-2 py-3",
                         "text-[11px] uppercase tracking-[0.2em] text-gray-400",
                         "transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
-                        "hover:border-white/20 hover:text-white",
+                        "hover:text-white hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.08)]",
                         "active:scale-[0.98]",
                       ].join(" ")}
                     >
-                      <div className="w-12 h-12 rounded-full border border-white/10 bg-black/40 flex items-center justify-center group-hover:border-white/25 group-hover:shadow-[0_0_18px_rgba(255,255,255,0.08)]">
+                      <div className="w-12 h-12 rounded-full border border-white/20 bg-transparent flex items-center justify-center group-hover:border-white/40 group-hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]">
                         {badge.badges?.id === "bond_007" ? (
                           <Badge007 className="w-9 h-9" />
                         ) : (

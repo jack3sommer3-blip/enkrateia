@@ -6,32 +6,25 @@ export default function Badge007({ className }: { className?: string }) {
       aria-hidden="true"
       role="img"
     >
-      <defs>
-        <linearGradient id="badge007Stroke" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.7)" />
-          <stop offset="100%" stopColor="rgba(255,255,255,0.3)" />
-        </linearGradient>
-      </defs>
       <circle
         cx="60"
         cy="60"
-        r="52"
-        fill="rgba(10,10,12,0.9)"
-        stroke="url(#badge007Stroke)"
+        r="50"
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity="0.6"
         strokeWidth="2"
       />
-      <circle cx="60" cy="60" r="44" fill="none" stroke="rgba(255,255,255,0.08)" />
       <g
         fill="none"
-        stroke="rgba(255,255,255,0.85)"
-        strokeWidth="6"
+        stroke="currentColor"
+        strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <circle cx="40" cy="60" r="14" />
-        <circle cx="70" cy="60" r="14" />
-        <path d="M96 44 L84 60 L92 60 L80 76" />
-        <path d="M84 60 L106 60" />
+        <circle cx="42" cy="60" r="12" />
+        <circle cx="72" cy="60" r="12" />
+        <path d="M92 48 H76 L88 48 L76 74" />
       </g>
     </svg>
   );
