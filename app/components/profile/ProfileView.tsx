@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import StoryLoading from "@/app/components/StoryLoading";
 import ActivityPost from "@/app/components/social/ActivityPost";
 import {
@@ -345,19 +344,32 @@ export default function ProfileView({
                       ].join(" ")}
                     >
                       {isBond007 && iconSrc ? (
-                        <Image
+                        <img
                           src={iconSrc}
+                          width={72}
+                          height={72}
                           alt="007 badge"
-                          width={88}
-                          height={88}
                           className="w-16 h-16 object-contain"
-                          unoptimized
+                          onError={(event) => {
+                            const img = event.currentTarget;
+                            img.style.display = "none";
+                            const fallback = img.nextElementSibling as HTMLDivElement | null;
+                            if (fallback) fallback.style.display = "flex";
+                          }}
                         />
                       ) : (
                         <div className="w-16 h-16 rounded-full border border-white/20 bg-transparent flex items-center justify-center group-hover:border-white/40 group-hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]">
                           <div className="text-sm">?</div>
                         </div>
                       )}
+                      {isBond007 ? (
+                        <div
+                          className="hidden w-16 h-16 rounded-full border border-white/30 text-white/90 items-center justify-center text-xs tracking-[0.2em]"
+                          aria-hidden="true"
+                        >
+                          007
+                        </div>
+                      ) : null}
                       <div
                         className="text-[10px] leading-none text-center tracking-[0.15em] font-semibold [font-variant-numeric:tabular-nums]"
                         style={{ transform: "none" }}
@@ -370,6 +382,18 @@ export default function ProfileView({
               </div>
             )}
           </div>
+          {process.env.NODE_ENV !== "production" ? (
+            <div className="mt-3 text-xs text-gray-500">
+              <a
+                href="/badges/007_badge_circle_transparent_cropped.png"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white"
+              >
+                Open badge asset
+              </a>
+            </div>
+          ) : null}
           {activeBadge ? (
             <div className="mt-4 rounded-md border border-white/10 bg-black/40 p-4 text-sm text-gray-300">
               <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
