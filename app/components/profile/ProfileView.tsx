@@ -18,6 +18,60 @@ import {
 import { checkAndAward007Badge, getUserBadges } from "@/lib/badges";
 import type { ActivityItem, Comment, Like, Profile, UserBadge } from "@/lib/types";
 
+function BadgeIcon007() {
+  const dev = process.env.NODE_ENV !== "production";
+  const baseSrc = "/badges/007_badge_circle_transparent_cropped.png";
+  const src = dev ? `${baseSrc}?v=${Date.now()}` : baseSrc;
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+  const [status, setStatus] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!dev) return;
+    let active = true;
+    fetch(baseSrc, { cache: "no-store" })
+      .then((res) => {
+        if (!active) return;
+        setStatus(res.status);
+      })
+      .catch(() => {
+        if (!active) return;
+        setStatus(-1);
+      });
+    return () => {
+      active = false;
+    };
+  }, [dev, baseSrc]);
+
+  return (
+    <div className="flex flex-col items-center">
+      {!errored ? (
+        <img
+          src={src}
+          width={72}
+          height={72}
+          alt="007 badge"
+          className="w-16 h-16 rounded-full object-cover"
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+        />
+      ) : (
+        <div className="w-16 h-16 rounded-full border border-white/30 text-white/90 flex items-center justify-center text-xs tracking-[0.2em]">
+          007
+        </div>
+      )}
+      {dev ? (
+        <div className="mt-2 text-[10px] text-gray-500 text-center leading-tight">
+          <div>src: {baseSrc}</div>
+          <div>onLoad: {loaded ? "true" : "false"}</div>
+          <div>onError: {errored ? "true" : "false"}</div>
+          <div>fetch: {status === null ? "…" : status}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type ProfileViewProps = {
   username?: string;
   viewerId?: string;
@@ -321,11 +375,7 @@ export default function ProfileView({
               <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(88px,1fr))]">
                 {badges.map((badge) => {
                   const label = badge.badges?.name ?? badge.badge_id;
-                  const iconSrc = badge.badges?.icon_key ?? null;
                   const isBond007 = badge.badges?.id === "bond_007";
-                  if (process.env.NODE_ENV !== "production" && isBond007) {
-                    console.debug("[BadgeIcon] 007 src", iconSrc);
-                  }
                   return (
                     <button
                       key={badge.id}
@@ -343,33 +393,13 @@ export default function ProfileView({
                         "active:scale-[0.98]",
                       ].join(" ")}
                     >
-                      {isBond007 && iconSrc ? (
-                        <img
-                          src={iconSrc}
-                          width={72}
-                          height={72}
-                          alt="007 badge"
-                          className="w-16 h-16 object-contain"
-                          onError={(event) => {
-                            const img = event.currentTarget;
-                            img.style.display = "none";
-                            const fallback = img.nextElementSibling as HTMLDivElement | null;
-                            if (fallback) fallback.style.display = "flex";
-                          }}
-                        />
+                      {isBond007 ? (
+                        <BadgeIcon007 />
                       ) : (
                         <div className="w-16 h-16 rounded-full border border-white/20 bg-transparent flex items-center justify-center group-hover:border-white/40 group-hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]">
                           <div className="text-sm">?</div>
                         </div>
                       )}
-                      {isBond007 ? (
-                        <div
-                          className="hidden w-16 h-16 rounded-full border border-white/30 text-white/90 items-center justify-center text-xs tracking-[0.2em]"
-                          aria-hidden="true"
-                        >
-                          007
-                        </div>
-                      ) : null}
                       <div
                         className="text-[10px] leading-none text-center tracking-[0.15em] font-semibold [font-variant-numeric:tabular-nums]"
                         style={{ transform: "none" }}
