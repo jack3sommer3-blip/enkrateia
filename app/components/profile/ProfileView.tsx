@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import StoryLoading from "@/app/components/StoryLoading";
 import ActivityPost from "@/app/components/social/ActivityPost";
-import Badge007 from "@/app/components/badges/Badge007";
 import {
   addComment,
   deleteComment,
@@ -322,6 +321,7 @@ export default function ProfileView({
               <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(88px,1fr))]">
                 {badges.map((badge) => {
                   const label = badge.badges?.name ?? badge.badge_id;
+                  const isBond007 = badge.badges?.id === "bond_007";
                   return (
                     <button
                       key={badge.id}
@@ -330,8 +330,8 @@ export default function ProfileView({
                       aria-label={`View badge: ${label}`}
                       title={`View badge: ${label}`}
                       className={[
-                        "group w-full aspect-square rounded-md border border-transparent",
-                        "bg-transparent",
+                        "group w-full aspect-square rounded-md",
+                        isBond007 ? "border border-transparent bg-transparent" : "border border-transparent bg-transparent",
                         "flex flex-col items-center justify-center gap-2 px-2 py-3",
                         "text-[11px] uppercase tracking-[0.2em] text-gray-400",
                         "transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
@@ -339,13 +339,17 @@ export default function ProfileView({
                         "active:scale-[0.98]",
                       ].join(" ")}
                     >
-                      <div className="w-16 h-16 rounded-full border border-white/20 bg-transparent flex items-center justify-center group-hover:border-white/40 group-hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]">
-                        {badge.badges?.id === "bond_007" ? (
-                          <Badge007 className="w-12 h-6" />
-                        ) : (
+                      {isBond007 ? (
+                        <img
+                          src="/badges/007.svg"
+                          alt="007 badge"
+                          className="w-16 h-16 text-white"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full border border-white/20 bg-transparent flex items-center justify-center group-hover:border-white/40 group-hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]">
                           <div className="text-sm">?</div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div
                         className="text-[10px] leading-none text-center tracking-[0.15em] font-semibold [font-variant-numeric:tabular-nums]"
                         style={{ transform: "none" }}
