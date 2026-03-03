@@ -73,6 +73,9 @@ export async function getFollowStatus(targetUserIds: string[]) {
   const { data: userData } = await supabase.auth.getUser();
   const followerId = userData.user?.id;
   if (!followerId) return {};
+  const debugEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "1";
   const { data, error } = await supabase
     .from("follows")
     .select("following_id")
@@ -83,6 +86,14 @@ export async function getFollowStatus(targetUserIds: string[]) {
   (data ?? []).forEach((row: any) => {
     map[row.following_id] = true;
   });
+  if (debugEnabled) {
+    console.debug("[getFollowStatus]", {
+      followerId,
+      targetUserIds,
+      rows: data ?? [],
+      map,
+    });
+  }
   return map;
 }
 
@@ -102,22 +113,63 @@ export async function getFollowCounts(userId: string) {
   };
 }
 
-export async function listFollowers(userId: string) {
+export async function getFollowingIds(userId: string) {
   const { data, error } = await supabase
     .from("follows")
-    .select("follower_id, following_id, created_at, profiles:follower_id(id, username, display_name, profile_photo_url)")
+    .select("following_id")
+    .eq("follower_id", userId);
+  if (error) return [];
+  return (data ?? []).map((row: any) => row.following_id as string);
+}
+
+export async function listFollowers(userId: string) {
+  const debugEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "1";
+  const { data, error } = await supabase
+    .from("follows")
+    .select("follower_id")
     .eq("following_id", userId);
   if (error) return [];
-  return data ?? [];
+  const followerIds = (data ?? []).map((row: any) => row.follower_id);
+  if (followerIds.length === 0) return [];
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, profile_photo_url")
+    .in("id", followerIds);
+  if (debugEnabled) {
+    console.debug("[listFollowers]", {
+      userId,
+      followerCount: followerIds.length,
+      profileCount: profiles?.length ?? 0,
+    });
+  }
+  return (profiles ?? []) as Profile[];
 }
 
 export async function listFollowing(userId: string) {
+  const debugEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "1";
   const { data, error } = await supabase
     .from("follows")
-    .select("follower_id, following_id, created_at, profiles:following_id(id, username, display_name, profile_photo_url)")
+    .select("following_id")
     .eq("follower_id", userId);
   if (error) return [];
-  return data ?? [];
+  const followingIds = (data ?? []).map((row: any) => row.following_id);
+  if (followingIds.length === 0) return [];
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, profile_photo_url")
+    .in("id", followingIds);
+  if (debugEnabled) {
+    console.debug("[listFollowing]", {
+      userId,
+      followingCount: followingIds.length,
+      profileCount: profiles?.length ?? 0,
+    });
+  }
+  return (profiles ?? []) as Profile[];
 }
 
 export async function getFeed(userIds: string[]) {

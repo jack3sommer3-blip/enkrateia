@@ -19,7 +19,7 @@ import {
   getFeedActivityStream,
   getLikesForFeed,
   ensureFeedItemIdForActivity,
-  listFollowing,
+  getFollowingIds,
   searchUsers,
   toggleLike,
   followUser,
@@ -73,11 +73,13 @@ export default function SocialClient() {
     const debugEnabled = searchParams.get("debug") === "1";
     const load = async () => {
       const backfill = await backfillFeedItemsForUser(userId);
-      const rows: any[] = await listFollowing(userId);
-      const followingIds = rows.map((row) => row.following_id);
+      const followingIds = await getFollowingIds(userId);
+      if (debugEnabled) {
+        console.debug("[follow] followingIds", followingIds);
+      }
       const followMap: Record<string, boolean> = {};
-      rows.forEach((row) => {
-        followMap[row.following_id] = true;
+      followingIds.forEach((id) => {
+        followMap[id] = true;
       });
       if (active) setFollowingMap(followMap);
 
@@ -170,8 +172,12 @@ export default function SocialClient() {
         setResults(data);
         if (data.length > 0) {
           const ids = data.map((row) => row.id);
+          const base: Record<string, boolean> = {};
+          ids.forEach((id) => {
+            base[id] = false;
+          });
           const status = await getFollowStatus(ids);
-          setFollowingMap((prev) => ({ ...prev, ...status }));
+          setFollowingMap((prev) => ({ ...prev, ...base, ...status }));
         }
         setLoadingResults(false);
       });

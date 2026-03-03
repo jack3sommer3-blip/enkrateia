@@ -240,9 +240,7 @@ export default function ProfileView({
           ? await listFollowers(profile.id)
           : await listFollowing(profile.id);
       if (!active) return;
-      const profiles = rows
-        .map((row: any) => row.profiles)
-        .filter(Boolean) as ProfileLite[];
+      const profiles = rows as ProfileLite[];
       setFollowList(profiles);
       setFollowListLoading(false);
       if (viewerId) {
