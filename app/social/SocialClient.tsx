@@ -8,6 +8,7 @@ import Tabs from "@/app/components/ui/Tabs";
 import { useSession } from "@/app/components/useSession";
 import { getProfile } from "@/lib/profile";
 import ProfileView from "@/app/components/profile/ProfileView";
+import { supabase } from "@/lib/supabase";
 import {
   addComment,
   backfillFeedItemsForUser,
@@ -56,11 +57,28 @@ export default function SocialClient() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
   const [followRefreshKey, setFollowRefreshKey] = useState(0);
   const [debugInfo, setDebugInfo] = useState<Awaited<ReturnType<typeof getActivityDebug>> | null>(null);
   const [activityErrors, setActivityErrors] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [feedDiagnostics, setFeedDiagnostics] = useState<{
+    viewerId: string;
+    followingIds: string[];
+    probeUserId?: string;
+    probeFeedCount?: number | null;
+    feedVisibleCount?: number | null;
+    profileFlags?: {
+      is_public: boolean;
+      show_workouts: boolean;
+      show_reading: boolean;
+      show_drinking: boolean;
+    } | null;
+    followRowExists?: boolean;
+    probeError?: string | null;
+    directProbe?: { rows?: any[]; error?: string | null };
+  } | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -74,6 +92,7 @@ export default function SocialClient() {
     const load = async () => {
       const backfill = await backfillFeedItemsForUser(userId);
       const followingIds = await getFollowingIds(userId);
+      if (active) setFollowingIds(followingIds);
       if (debugEnabled) {
         console.debug("[follow] followingIds", followingIds);
       }
@@ -158,6 +177,54 @@ export default function SocialClient() {
     if (!debugEnabled || !userId) return;
     getActivityDebug(userId).then(setDebugInfo);
   }, [searchParams, userId]);
+
+  useEffect(() => {
+    const debugEnabled = searchParams.get("debug") === "1";
+    if (!debugEnabled || !userId || followingIds.length === 0) return;
+    let active = true;
+    const run = async () => {
+      const probeId = followingIds[0];
+      const followRow = await supabase
+        .from("follows")
+        .select("follower_id, following_id")
+        .eq("follower_id", userId)
+        .eq("following_id", probeId)
+        .maybeSingle();
+
+      const flags = await supabase
+        .from("profiles")
+        .select("is_public, show_workouts, show_reading, show_drinking")
+        .eq("id", probeId)
+        .maybeSingle();
+
+      const countAll = await supabase
+        .from("feed_items")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", probeId);
+
+      const visible = await supabase
+        .from("feed_items")
+        .select("id", { count: "exact", head: true })
+        .in("user_id", [userId, ...followingIds])
+        .eq("user_id", probeId);
+
+      if (!active) return;
+      setFeedDiagnostics({
+        viewerId: userId,
+        followingIds,
+        probeUserId: probeId,
+        probeFeedCount: countAll.count ?? null,
+        feedVisibleCount: visible.count ?? null,
+        profileFlags: flags.data ?? null,
+        followRowExists: Boolean(followRow.data),
+        probeError: countAll.error?.message ?? visible.error?.message ?? null,
+      });
+    };
+    run();
+    return () => {
+      active = false;
+    };
+  }, [searchParams, userId, followingIds]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -402,6 +469,62 @@ export default function SocialClient() {
                 {debugInfo.errors.length > 0 ? (
                   <div className="mt-2 text-rose-300">
                     Debug errors: {debugInfo.errors.join(" | ")}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {searchParams.get("debug") === "1" && feedDiagnostics ? (
+              <div className="command-surface rounded-md p-4 text-xs text-gray-400">
+                <div className="text-gray-300 mb-2">Feed Diagnostics</div>
+                <div>Viewer: {feedDiagnostics.viewerId}</div>
+                <div>
+                  Following ({feedDiagnostics.followingIds.length}):{" "}
+                  {feedDiagnostics.followingIds.slice(0, 5).join(", ")}
+                </div>
+                <div>Probe user: {feedDiagnostics.probeUserId}</div>
+                <div>Follow row exists: {String(feedDiagnostics.followRowExists)}</div>
+                <div>Feed items (probe user): {feedDiagnostics.probeFeedCount ?? "?"}</div>
+                <div>
+                  Feed visible count (probe user):{" "}
+                  {feedDiagnostics.feedVisibleCount ?? "?"}
+                </div>
+                <div>
+                  Profile flags:{" "}
+                  {feedDiagnostics.profileFlags
+                    ? `public=${feedDiagnostics.profileFlags.is_public}, workouts=${feedDiagnostics.profileFlags.show_workouts}, reading=${feedDiagnostics.profileFlags.show_reading}, drinking=${feedDiagnostics.profileFlags.show_drinking}`
+                    : "unknown"}
+                </div>
+                {feedDiagnostics.probeError ? (
+                  <div className="text-rose-300">Probe error: {feedDiagnostics.probeError}</div>
+                ) : null}
+                <button
+                  type="button"
+                  className="mt-2 px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+                  onClick={async () => {
+                    if (!feedDiagnostics.probeUserId) return;
+                    const { data, error } = await supabase
+                      .from("feed_items")
+                      .select("id,user_id,event_type,created_at")
+                      .eq("user_id", feedDiagnostics.probeUserId)
+                      .limit(5);
+                    setFeedDiagnostics((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            directProbe: { rows: data ?? [], error: error?.message ?? null },
+                          }
+                        : prev
+                    );
+                  }}
+                >
+                  Direct probe
+                </button>
+                {feedDiagnostics.directProbe ? (
+                  <div className="mt-2 text-gray-500">
+                    Direct probe:{" "}
+                    {feedDiagnostics.directProbe.error
+                      ? feedDiagnostics.directProbe.error
+                      : `${feedDiagnostics.directProbe.rows?.length ?? 0} rows`}
                   </div>
                 ) : null}
               </div>
