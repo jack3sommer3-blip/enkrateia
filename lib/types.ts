@@ -3,9 +3,18 @@ export type ActivityType =
   | "Walking"
   | "Treadmill Walking"
   | "Weight Lifting"
-  | "Cycling"
+  | "Cycling" // legacy
+  | "Indoor Cycling"
+  | "Outdoor Cycling"
   | "HIIT"
-  | "Yoga";
+  | "Yoga"
+  | "Ruck"
+  | "Pilates"
+  | "Barre"
+  | "Hike"
+  | "Pickleball"
+  | "Tennis"
+  | "Basketball";
 
 export type WorkoutActivity = {
   id: string;

@@ -258,6 +258,8 @@ function ensureUuid(value: string | undefined, seed: string) {
 
 function workoutSummary(activity: WorkoutActivity) {
   const minutes = intFromText(activity.minutesText) ?? 0;
+  const activityType =
+    activity.type === "Cycling" ? "Outdoor Cycling" : activity.type;
   const seconds = intFromText(activity.secondsText) ?? 0;
   const intensity = intFromText(activity.intensityText);
   const timeLabel =
@@ -267,7 +269,7 @@ function workoutSummary(activity: WorkoutActivity) {
         ? `${seconds} sec`
         : undefined;
   const parts = [
-    activity.type,
+    activityType,
     activity.environment,
     timeLabel,
     intensity ? `Intensity ${intensity}` : undefined,
@@ -854,9 +856,6 @@ export async function getFeedActivityStream(
   days = 30
 ): Promise<{ items: ActivityItem[]; errors: string[] }> {
   const errors: string[] = [];
-  const debugEnabled =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("debug") === "1";
   const start = addDays(new Date(), -(Math.max(days, 1) - 1));
   const startIso = start.toISOString();
   const { items: selfItemsRaw, errors: selfErrors } = await getSelfActivityStream(
@@ -867,14 +866,6 @@ export async function getFeedActivityStream(
   const selfItems = selfItemsRaw.filter(isValidActivityItem);
 
   const allIds = Array.from(new Set([userId, ...followedIds]));
-  if (debugEnabled) {
-    console.debug("[feed] viewer", {
-      userId,
-      followedIdsCount: followedIds.length,
-      followedIds,
-      allIds,
-    });
-  }
   const feedSelect =
     "id, user_id, created_at, event_date, event_type, event_id, summary, metadata";
   const { data: feedItems, error: feedError } = await supabase
@@ -886,9 +877,6 @@ export async function getFeedActivityStream(
     .limit(100);
 
   if (feedError) errors.push(feedError.message);
-  if (debugEnabled) {
-    console.debug("[feed] select", { feedSelect, error: feedError?.message ?? null });
-  }
 
   let profileMap = new Map<string, any>();
   const feedUserIds = Array.from(
@@ -900,12 +888,6 @@ export async function getFeedActivityStream(
       .select("id, username, display_name, profile_photo_url")
       .in("id", feedUserIds);
     if (profileError) errors.push(profileError.message);
-    if (debugEnabled) {
-      console.debug("[feed] profiles", {
-        count: profiles?.length ?? 0,
-        error: profileError?.message ?? null,
-      });
-    }
     (profiles ?? []).forEach((p: any) => profileMap.set(p.id, p));
   }
   if (debugEnabled) {
@@ -919,23 +901,6 @@ export async function getFeedActivityStream(
     });
   }
 
-  if (
-    debugEnabled &&
-    followedIds.length > 0 &&
-    (feedItems ?? []).every((item: any) => item.user_id === userId)
-  ) {
-    const probeId = followedIds[0];
-    const { data: probe } = await supabase
-      .from("feed_items")
-      .select("id")
-      .eq("user_id", probeId)
-      .gte("created_at", startIso)
-      .limit(5);
-    console.debug("[feed] probe followed user", {
-      probeId,
-      count: probe?.length ?? 0,
-    });
-  }
 
   const feedActivity: ActivityItem[] = (feedItems ?? [])
     .filter((item: any) => item.user_id !== userId)

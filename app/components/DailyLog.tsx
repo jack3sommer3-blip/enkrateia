@@ -116,6 +116,30 @@ const Select = ({ isFutureDate, ...props }: SelectProps) => (
   />
 );
 
+const WORKOUT_TYPES: ActivityType[] = [
+  "Basketball",
+  "Barre",
+  "HIIT",
+  "Hike",
+  "Indoor Cycling",
+  "Outdoor Cycling",
+  "Pickleball",
+  "Pilates",
+  "Ruck",
+  "Running",
+  "Tennis",
+  "Treadmill Walking",
+  "Walking",
+  "Weight Lifting",
+  "Yoga",
+];
+
+function normalizeWorkoutType(value: string | undefined): ActivityType | undefined {
+  if (!value) return undefined;
+  if (value === "Cycling") return "Outdoor Cycling";
+  return value as ActivityType;
+}
+
 type CardProps = {
   title: string;
   subtitle: string;
@@ -326,6 +350,7 @@ export default function DailyLog({
   const [drinkingEditId, setDrinkingEditId] = useState<string | null>(null);
   const [exerciseOpen, setExerciseOpen] = useState(false);
   const [exerciseType, setExerciseType] = useState<ActivityType>("Weight Lifting");
+  const [recentWorkoutTypes, setRecentWorkoutTypes] = useState<ActivityType[]>([]);
   const [exerciseEnvironment, setExerciseEnvironment] = useState<
     "" | "indoor" | "outdoor"
   >("");
@@ -452,6 +477,50 @@ export default function DailyLog({
       mounted = false;
     };
   }, [dateKey, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    const loadRecents = async () => {
+      const start = addDays(new Date(), -30);
+      const startKey = toDateKey(start);
+      const { data } = await supabase
+        .from("daily_logs")
+        .select("date, data")
+        .eq("user_id", userId)
+        .gte("date", startKey)
+        .order("date", { ascending: false })
+        .limit(60);
+      if (!active) return;
+      const stats = new Map<ActivityType, { lastSeen: number; count: number }>();
+      let order = 0;
+      (data ?? []).forEach((row: any) => {
+        const activities = row?.data?.workouts?.activities ?? [];
+        activities.forEach((activity: WorkoutActivity) => {
+          const normalized = normalizeWorkoutType(activity.type);
+          if (!normalized) return;
+          const current = stats.get(normalized);
+          if (!current) {
+            stats.set(normalized, { lastSeen: order, count: 1 });
+          } else {
+            current.count += 1;
+          }
+          order += 1;
+        });
+      });
+      const sorted = Array.from(stats.entries())
+        .sort((a, b) => {
+          if (a[1].lastSeen !== b[1].lastSeen) return a[1].lastSeen - b[1].lastSeen;
+          return b[1].count - a[1].count;
+        })
+        .map(([type]) => type);
+      setRecentWorkoutTypes(sorted.slice(0, 5));
+    };
+    loadRecents();
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!debugEnabled) return;
@@ -912,16 +981,24 @@ export default function DailyLog({
                         isFutureDate={isFutureDate}
                         value={exerciseType}
                         onChange={(e) =>
-                          setExerciseType(e.target.value as ActivityType)
+                          setExerciseType(normalizeWorkoutType(e.target.value) ?? "Weight Lifting")
                         }
                       >
-                        <option>Running</option>
-                        <option>Walking</option>
-                        <option>Treadmill Walking</option>
-                        <option>Weight Lifting</option>
-                        <option>Cycling</option>
-                        <option>HIIT</option>
-                        <option>Yoga</option>
+                        {recentWorkoutTypes.length > 0 ? (
+                          <optgroup label="Recently used">
+                            {recentWorkoutTypes.map((type) => (
+                              <option key={`recent-${type}`} value={type}>
+                                {type}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : null}
+                        <option disabled>──────────</option>
+                        {WORKOUT_TYPES.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
                       </Select>
                     </div>
                     <div>
@@ -1008,7 +1085,7 @@ export default function DailyLog({
                         const loggedAt = new Date().toISOString();
                         const newWorkout: WorkoutActivity = {
                           id: workoutId,
-                          type: exerciseType,
+                          type: normalizeWorkoutType(exerciseType) ?? exerciseType,
                           minutesText: minutes,
                           secondsText: seconds,
                           caloriesText: calories,
@@ -1026,6 +1103,12 @@ export default function DailyLog({
                             ],
                           },
                         }));
+                        setRecentWorkoutTypes((prev) => {
+                          const normalized = normalizeWorkoutType(newWorkout.type);
+                          if (!normalized) return prev;
+                          const next = [normalized, ...prev.filter((t) => t !== normalized)];
+                          return next.slice(0, 5);
+                        });
                         if (isValidWorkout(newWorkout)) {
                           const summaryParts = [
                             exerciseType,
@@ -1081,13 +1164,15 @@ export default function DailyLog({
               </div>
             ) : (
               <div className="mt-4 space-y-4">
-                {data.workouts.activities.map((a) => (
+                {data.workouts.activities.map((a) => {
+                  const displayType = normalizeWorkoutType(a.type) ?? a.type;
+                  return (
                   <div
                     key={a.id}
                     className="p-4 rounded-md bg-black/40 border border-white/10 flex items-center justify-between"
                   >
                     <div className="text-gray-200">
-                      <div className="font-semibold">{a.type}</div>
+                      <div className="font-semibold">{displayType}</div>
                       <div className="text-gray-400 text-sm">
                         {a.minutesText || a.secondsText
                           ? `${a.minutesText ?? "0"}m ${a.secondsText ?? "0"}s`
@@ -1107,7 +1192,8 @@ export default function DailyLog({
                       Remove
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
