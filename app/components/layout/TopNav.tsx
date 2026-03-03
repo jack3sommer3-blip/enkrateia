@@ -66,7 +66,7 @@ export default function TopNav() {
           <div className="text-xs tracking-[0.4em] text-gray-500">ENKRATEIA</div>
         </div>
 
-        <nav className="flex flex-1 items-center justify-center gap-6 overflow-x-auto px-4 text-sm text-gray-400">
+        <nav className="flex flex-1 items-center justify-center gap-6 px-4 text-sm text-gray-400">
           {LINKS.map((link) => {
             const active = pathname === link.href;
             return (
