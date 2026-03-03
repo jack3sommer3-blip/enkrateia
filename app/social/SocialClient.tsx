@@ -24,6 +24,7 @@ import {
   toggleLike,
   followUser,
   unfollowUser,
+  getFollowStatus,
 } from "@/lib/social";
 import type { Comment, Like, Profile, ActivityItem } from "@/lib/types";
 import ActivityPost from "@/app/components/social/ActivityPost";
@@ -55,6 +56,8 @@ export default function SocialClient() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+  const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
+  const [followRefreshKey, setFollowRefreshKey] = useState(0);
   const [debugInfo, setDebugInfo] = useState<Awaited<ReturnType<typeof getActivityDebug>> | null>(null);
   const [activityErrors, setActivityErrors] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -163,8 +166,13 @@ export default function SocialClient() {
     }
     setLoadingResults(true);
     debounceRef.current = setTimeout(() => {
-      searchUsers(query).then((data) => {
+      searchUsers(query).then(async (data) => {
         setResults(data);
+        if (data.length > 0) {
+          const ids = data.map((row) => row.id);
+          const status = await getFollowStatus(ids);
+          setFollowingMap((prev) => ({ ...prev, ...status }));
+        }
         setLoadingResults(false);
       });
     }, 350);
@@ -419,14 +427,19 @@ export default function SocialClient() {
                       className="flex items-center justify-between py-4 hover:bg-white/5 transition"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-800 border border-white/10 overflow-hidden">
+                        <div className="w-10 h-10 rounded-full bg-gray-800 border border-white/10 overflow-hidden flex items-center justify-center text-xs text-gray-300">
                           {result.profile_photo_url ? (
                             <img
                               src={result.profile_photo_url}
                               alt={result.display_name ?? result.username}
                               className="w-full h-full object-cover"
                             />
-                          ) : null}
+                          ) : (
+                            <span>
+                              {(result.display_name ?? result.username)?.charAt(0)?.toUpperCase() ??
+                                "?"}
+                            </span>
+                          )}
                         </div>
                         <div>
                           <Link
@@ -441,25 +454,41 @@ export default function SocialClient() {
                       {userId && userId !== result.id ? (
                         <button
                           onClick={async () => {
+                            if (followLoading[result.id]) return;
+                            setFollowLoading((prev) => ({ ...prev, [result.id]: true }));
                             if (followingMap[result.id]) {
-                              const ok = await unfollowUser(userId, result.id);
-                              if (ok)
+                              const res = await unfollowUser(result.id);
+                              if (res.ok) {
                                 setFollowingMap((prev) => ({
                                   ...prev,
                                   [result.id]: false,
                                 }));
+                                if (profile?.id === result.id) {
+                                  setFollowRefreshKey((prev) => prev + 1);
+                                }
+                              }
                             } else {
-                              const res = await followUser(userId, result.id);
-                              if (res)
+                              const res = await followUser(result.id);
+                              if (res.ok) {
                                 setFollowingMap((prev) => ({
                                   ...prev,
                                   [result.id]: true,
                                 }));
+                                if (profile?.id === result.id) {
+                                  setFollowRefreshKey((prev) => prev + 1);
+                                }
+                              }
                             }
+                            setFollowLoading((prev) => ({ ...prev, [result.id]: false }));
                           }}
-                          className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300"
+                          disabled={followLoading[result.id]}
+                          className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          {followingMap[result.id] ? "Unfollow" : "Follow"}
+                          {followLoading[result.id]
+                            ? "..."
+                            : followingMap[result.id]
+                              ? "Following"
+                              : "Follow"}
                         </button>
                       ) : null}
                     </div>
@@ -474,6 +503,7 @@ export default function SocialClient() {
           <ProfileView
             username={profile?.username}
             viewerId={userId}
+            followRefreshKey={followRefreshKey}
             commentCounts={commentCounts}
             onCommentCountChange={(feedItemId, count) => {
               setCommentCounts((prev) => ({ ...prev, [feedItemId]: count }));

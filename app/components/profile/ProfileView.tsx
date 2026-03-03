@@ -14,9 +14,22 @@ import {
   ensureFeedItemIdForActivity,
   getProfileByUsername,
   getCommentCounts,
+  getFollowCounts,
+  getFollowStatus,
+  listFollowers,
+  listFollowing,
+  followUser,
+  unfollowUser,
 } from "@/lib/social";
 import { checkAndAward007Badge, getUserBadges } from "@/lib/badges";
 import type { ActivityItem, Comment, Like, Profile, UserBadge } from "@/lib/types";
+
+type ProfileLite = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  profile_photo_url: string | null;
+};
 
 function BadgeIcon007() {
   const dev = process.env.NODE_ENV !== "production";
@@ -72,11 +85,30 @@ function BadgeIcon007() {
   );
 }
 
+function Avatar({ profile }: { profile: ProfileLite }) {
+  const label = profile.display_name || profile.username;
+  const initial = label?.trim()?.charAt(0)?.toUpperCase() ?? "?";
+  return (
+    <div className="w-10 h-10 rounded-full bg-gray-800 border border-white/10 overflow-hidden flex items-center justify-center text-xs text-gray-300">
+      {profile.profile_photo_url ? (
+        <img
+          src={profile.profile_photo_url}
+          alt={label ?? profile.username}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <span>{initial}</span>
+      )}
+    </div>
+  );
+}
+
 type ProfileViewProps = {
   username?: string;
   viewerId?: string;
   commentCounts?: Record<string, number>;
   onCommentCountChange?: (feedItemId: string, count: number) => void;
+  followRefreshKey?: number;
 };
 
 export default function ProfileView({
@@ -84,6 +116,7 @@ export default function ProfileView({
   viewerId,
   commentCounts: externalCounts,
   onCommentCountChange,
+  followRefreshKey,
 }: ProfileViewProps) {
   const [profile, setProfile] = useState<Profile | undefined>();
   const [loading, setLoading] = useState(true);
@@ -94,6 +127,14 @@ export default function ProfileView({
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [badges, setBadges] = useState<UserBadge[]>([]);
   const [activeBadge, setActiveBadge] = useState<UserBadge | null>(null);
+  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
+  const [followList, setFollowList] = useState<ProfileLite[]>([]);
+  const [followListType, setFollowListType] = useState<"followers" | "following" | null>(
+    null
+  );
+  const [followListLoading, setFollowListLoading] = useState(false);
+  const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
+  const [followActionLoading, setFollowActionLoading] = useState<Record<string, boolean>>({});
   const debugEnabled = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("debug") === "1"
     : false;
@@ -177,6 +218,44 @@ export default function ProfileView({
     };
   }, [profile?.id]);
 
+  useEffect(() => {
+    if (!profile?.id) return;
+    let active = true;
+    getFollowCounts(profile.id).then((counts) => {
+      if (!active) return;
+      setFollowCounts(counts);
+    });
+    return () => {
+      active = false;
+    };
+  }, [profile?.id, followRefreshKey]);
+
+  useEffect(() => {
+    if (!followListType || !profile?.id) return;
+    let active = true;
+    setFollowListLoading(true);
+    const load = async () => {
+      const rows =
+        followListType === "followers"
+          ? await listFollowers(profile.id)
+          : await listFollowing(profile.id);
+      if (!active) return;
+      const profiles = rows
+        .map((row: any) => row.profiles)
+        .filter(Boolean) as ProfileLite[];
+      setFollowList(profiles);
+      setFollowListLoading(false);
+      if (viewerId) {
+        const status = await getFollowStatus(profiles.map((p) => p.id));
+        if (active) setFollowStatus(status);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [followListType, profile?.id, viewerId]);
+
   const displayName = useMemo(() => {
     if (!profile) return "";
     return profile.display_name || `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim();
@@ -210,6 +289,23 @@ export default function ProfileView({
                 {displayName || "Profile"}
               </div>
               <div className="text-gray-400 mt-1">@{profile.username ?? ""}</div>
+              <div className="mt-3 flex items-center gap-4 text-xs uppercase tracking-[0.25em] text-gray-500">
+                <button
+                  type="button"
+                  onClick={() => setFollowListType("followers")}
+                  className="hover:text-white transition"
+                >
+                  {followCounts.followers} Followers
+                </button>
+                <span className="text-gray-700">|</span>
+                <button
+                  type="button"
+                  onClick={() => setFollowListType("following")}
+                  className="hover:text-white transition"
+                >
+                  {followCounts.following} Following
+                </button>
+              </div>
             </div>
           </div>
           {viewerId && viewerId === profile.id ? (
@@ -222,6 +318,99 @@ export default function ProfileView({
           ) : null}
         </div>
       </div>
+
+      {followListType ? (
+        <div className="mt-4 command-surface rounded-md p-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm uppercase tracking-[0.3em] text-gray-500">
+              {followListType === "followers" ? "Followers" : "Following"}
+            </div>
+            <button
+              type="button"
+              onClick={() => setFollowListType(null)}
+              className="text-xs uppercase tracking-[0.2em] text-gray-400 hover:text-white"
+            >
+              Close
+            </button>
+          </div>
+          <div className="mt-4 space-y-3">
+            {followListLoading ? (
+              <div className="text-gray-500">Loading…</div>
+            ) : followList.length === 0 ? (
+              <div className="text-gray-500">No users yet.</div>
+            ) : (
+              followList.map((person) => (
+                <div
+                  key={person.id}
+                  className="flex items-center justify-between py-2"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar profile={person} />
+                    <div>
+                      <Link
+                        href={`/u/${person.username}`}
+                        className="text-white hover:text-white/80 transition"
+                      >
+                        {person.display_name ?? person.username}
+                      </Link>
+                      <div className="text-gray-400 text-sm">@{person.username}</div>
+                    </div>
+                  </div>
+                  {viewerId && viewerId !== person.id ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (followActionLoading[person.id]) return;
+                        setFollowActionLoading((prev) => ({
+                          ...prev,
+                          [person.id]: true,
+                        }));
+                        if (followStatus[person.id]) {
+                          const res = await unfollowUser(person.id);
+                          if (res.ok) {
+                            setFollowStatus((prev) => ({
+                              ...prev,
+                              [person.id]: false,
+                            }));
+                            setFollowCounts((prev) => ({
+                              ...prev,
+                              following: Math.max(0, prev.following - 1),
+                            }));
+                          }
+                        } else {
+                          const res = await followUser(person.id);
+                          if (res.ok) {
+                            setFollowStatus((prev) => ({
+                              ...prev,
+                              [person.id]: true,
+                            }));
+                            setFollowCounts((prev) => ({
+                              ...prev,
+                              following: prev.following + 1,
+                            }));
+                          }
+                        }
+                        setFollowActionLoading((prev) => ({
+                          ...prev,
+                          [person.id]: false,
+                        }));
+                      }}
+                      className="px-3 py-2 rounded-md border border-white/10 hover:border-white/20 text-gray-300 text-xs uppercase tracking-[0.2em] disabled:opacity-60"
+                      disabled={followActionLoading[person.id]}
+                    >
+                      {followActionLoading[person.id]
+                        ? "..."
+                        : followStatus[person.id]
+                          ? "Following"
+                          : "Follow"}
+                    </button>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="command-surface rounded-md p-6">

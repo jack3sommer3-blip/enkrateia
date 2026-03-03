@@ -41,23 +41,65 @@ export async function getProfileByUsername(username: string) {
   return data as Profile;
 }
 
-export async function followUser(followerId: string, followingId: string) {
-  const { data, error } = await supabase
+export async function followUser(followingId: string) {
+  const { data: userData } = await supabase.auth.getUser();
+  const followerId = userData.user?.id;
+  if (!followerId) return { ok: false, error: "Not authenticated." };
+  const { error } = await supabase
     .from("follows")
-    .insert({ follower_id: followerId, following_id: followingId })
-    .select("follower_id, following_id, created_at")
-    .single();
-  if (error) return undefined;
-  return data as Follow;
+    .insert({ follower_id: followerId, following_id: followingId });
+  if (error) {
+    if (error.code === "23505") return { ok: true };
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
 }
 
-export async function unfollowUser(followerId: string, followingId: string) {
+export async function unfollowUser(followingId: string) {
+  const { data: userData } = await supabase.auth.getUser();
+  const followerId = userData.user?.id;
+  if (!followerId) return { ok: false, error: "Not authenticated." };
   const { error } = await supabase
     .from("follows")
     .delete()
     .eq("following_id", followingId)
     .eq("follower_id", followerId);
-  return !error;
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function getFollowStatus(targetUserIds: string[]) {
+  if (targetUserIds.length === 0) return {};
+  const { data: userData } = await supabase.auth.getUser();
+  const followerId = userData.user?.id;
+  if (!followerId) return {};
+  const { data, error } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", followerId)
+    .in("following_id", targetUserIds);
+  if (error) return {};
+  const map: Record<string, boolean> = {};
+  (data ?? []).forEach((row: any) => {
+    map[row.following_id] = true;
+  });
+  return map;
+}
+
+export async function getFollowCounts(userId: string) {
+  const followers = await supabase
+    .from("follows")
+    .select("follower_id", { count: "exact", head: true })
+    .eq("following_id", userId);
+  const following = await supabase
+    .from("follows")
+    .select("following_id", { count: "exact", head: true })
+    .eq("follower_id", userId);
+
+  return {
+    followers: followers.count ?? 0,
+    following: following.count ?? 0,
+  };
 }
 
 export async function listFollowers(userId: string) {
