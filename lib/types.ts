@@ -90,6 +90,7 @@ export type Profile = {
   first_name: string;
   last_name: string;
   location?: string | null;
+  notifications_last_seen_at?: string | null;
 };
 
 export type GoalCategory = {

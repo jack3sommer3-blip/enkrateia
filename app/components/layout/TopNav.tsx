@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/app/components/useSession";
 import { getProfile } from "@/lib/profile";
 import { supabase } from "@/lib/supabase";
+import { getUnreadNotificationCount } from "@/lib/notifications";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -20,6 +21,7 @@ export default function TopNav() {
   const { userId } = useSession();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -27,6 +29,21 @@ export default function TopNav() {
     getProfile(userId).then((profile) => {
       setPhotoUrl(profile?.profile_photo_url ?? null);
     });
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    const load = async () => {
+      const count = await getUnreadNotificationCount(userId);
+      if (active) setUnreadCount(count);
+    };
+    load();
+    const timer = setInterval(load, 30000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -76,6 +93,29 @@ export default function TopNav() {
         </nav>
 
         <div className="relative flex items-center gap-3" ref={menuRef}>
+          <Link
+            href="/notifications"
+            className="relative h-9 w-9 rounded-full border border-white/10 bg-slate-800/80 flex items-center justify-center hover:border-white/20 transition"
+            aria-label="Notifications"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4 text-gray-300"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+              <path d="M13.73 21a2 2 0 01-3.46 0" />
+            </svg>
+            {unreadCount > 0 ? (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                {unreadCount}
+              </span>
+            ) : null}
+          </Link>
           <button
             onClick={() => setMenuOpen((prev) => !prev)}
             className="h-9 w-9 rounded-full border border-white/10 bg-slate-800 overflow-hidden flex items-center justify-center"
