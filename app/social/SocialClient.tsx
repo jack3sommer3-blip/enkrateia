@@ -292,6 +292,13 @@ export default function SocialClient() {
                     : undefined);
                     const feedId = item.feed_item_id;
                     const commentCount = feedId ? commentCounts[feedId] ?? 0 : 0;
+                    if (searchParams.get("debug") === "1") {
+                      console.debug("[feed] render item", {
+                        userId: item.user_id,
+                        eventType: item.event_type,
+                        feedId,
+                      });
+                    }
                     return (
                       <ActivityPost
                     key={`${item.user_id}-${item.event_type}-${item.event_id}`}

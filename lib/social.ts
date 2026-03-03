@@ -875,17 +875,39 @@ export async function getFeedActivityStream(
       allIds,
     });
   }
+  const feedSelect =
+    "id, user_id, created_at, event_date, event_type, event_id, summary, metadata";
   const { data: feedItems, error: feedError } = await supabase
     .from("feed_items")
-    .select(
-      "id, user_id, created_at, event_date, event_type, event_id, summary, metadata, profiles:user_id(username, display_name, profile_photo_url)"
-    )
+    .select(feedSelect)
     .in("user_id", allIds)
     .gte("created_at", startIso)
     .order("created_at", { ascending: false })
     .limit(100);
 
   if (feedError) errors.push(feedError.message);
+  if (debugEnabled) {
+    console.debug("[feed] select", { feedSelect, error: feedError?.message ?? null });
+  }
+
+  let profileMap = new Map<string, any>();
+  const feedUserIds = Array.from(
+    new Set((feedItems ?? []).map((item: any) => item.user_id))
+  );
+  if (feedUserIds.length > 0) {
+    const { data: profiles, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, username, display_name, profile_photo_url")
+      .in("id", feedUserIds);
+    if (profileError) errors.push(profileError.message);
+    if (debugEnabled) {
+      console.debug("[feed] profiles", {
+        count: profiles?.length ?? 0,
+        error: profileError?.message ?? null,
+      });
+    }
+    (profiles ?? []).forEach((p: any) => profileMap.set(p.id, p));
+  }
   if (debugEnabled) {
     const counts: Record<string, number> = {};
     (feedItems ?? []).forEach((item: any) => {
@@ -927,7 +949,7 @@ export async function getFeedActivityStream(
       summary: item.summary,
       metadata: item.metadata ?? {},
       feed_item_id: item.id,
-      profile: item.profiles ?? undefined,
+      profile: profileMap.get(item.user_id) ?? undefined,
     }))
     .filter(isValidActivityItem);
 
