@@ -890,18 +890,6 @@ export async function getFeedActivityStream(
     if (profileError) errors.push(profileError.message);
     (profiles ?? []).forEach((p: any) => profileMap.set(p.id, p));
   }
-  if (debugEnabled) {
-    const counts: Record<string, number> = {};
-    (feedItems ?? []).forEach((item: any) => {
-      counts[item.user_id] = (counts[item.user_id] ?? 0) + 1;
-    });
-    console.debug("[feed] results", {
-      total: feedItems?.length ?? 0,
-      perUser: counts,
-    });
-  }
-
-
   const feedActivity: ActivityItem[] = (feedItems ?? [])
     .filter((item: any) => item.user_id !== userId)
     .map((item: any) => ({
