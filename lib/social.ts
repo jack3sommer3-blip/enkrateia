@@ -854,6 +854,9 @@ export async function getFeedActivityStream(
   days = 30
 ): Promise<{ items: ActivityItem[]; errors: string[] }> {
   const errors: string[] = [];
+  const debugEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "1";
   const start = addDays(new Date(), -(Math.max(days, 1) - 1));
   const startIso = start.toISOString();
   const { items: selfItemsRaw, errors: selfErrors } = await getSelfActivityStream(
@@ -864,6 +867,14 @@ export async function getFeedActivityStream(
   const selfItems = selfItemsRaw.filter(isValidActivityItem);
 
   const allIds = Array.from(new Set([userId, ...followedIds]));
+  if (debugEnabled) {
+    console.debug("[feed] viewer", {
+      userId,
+      followedIdsCount: followedIds.length,
+      followedIds,
+      allIds,
+    });
+  }
   const { data: feedItems, error: feedError } = await supabase
     .from("feed_items")
     .select(
@@ -875,6 +886,34 @@ export async function getFeedActivityStream(
     .limit(100);
 
   if (feedError) errors.push(feedError.message);
+  if (debugEnabled) {
+    const counts: Record<string, number> = {};
+    (feedItems ?? []).forEach((item: any) => {
+      counts[item.user_id] = (counts[item.user_id] ?? 0) + 1;
+    });
+    console.debug("[feed] results", {
+      total: feedItems?.length ?? 0,
+      perUser: counts,
+    });
+  }
+
+  if (
+    debugEnabled &&
+    followedIds.length > 0 &&
+    (feedItems ?? []).every((item: any) => item.user_id === userId)
+  ) {
+    const probeId = followedIds[0];
+    const { data: probe } = await supabase
+      .from("feed_items")
+      .select("id")
+      .eq("user_id", probeId)
+      .gte("created_at", startIso)
+      .limit(5);
+    console.debug("[feed] probe followed user", {
+      probeId,
+      count: probe?.length ?? 0,
+    });
+  }
 
   const feedActivity: ActivityItem[] = (feedItems ?? [])
     .filter((item: any) => item.user_id !== userId)
