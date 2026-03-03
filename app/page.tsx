@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/profile";
 import type { Profile } from "@/lib/types";
 import { addDays, formatScore, startOfDay, toDateKey, todayKey } from "@/lib/utils";
+import { getWindowMetrics } from "@/lib/metrics";
 import MetricCard from "@/app/components/ui/MetricCard";
 import Timeline from "@/app/components/ui/Timeline";
 import CommandCard from "@/app/components/layout/CommandCard";
@@ -61,18 +62,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!userId) return;
     setLogsLoading(true);
-    const today = startOfDay(new Date());
-    const start = addDays(today, -29);
-    const startKey = toDateKey(start);
-
     supabase
       .from("daily_logs")
       .select(
         "date,total_score,workout_score,sleep_score,diet_score,reading_score,community_score"
       )
       .eq("user_id", userId)
-      .gte("date", startKey)
       .order("date", { ascending: false })
+      .limit(60)
       .then(({ data }) => {
         const todayKeyValue = todayKey();
         const rows = (data ?? [])
@@ -111,39 +108,19 @@ export default function DashboardPage() {
       });
   }, [userId]);
 
+  const scoreSeries = useMemo(
+    () => logs.map((row) => row.total_score ?? 0),
+    [logs]
+  );
+
+  const metrics7 = useMemo(() => getWindowMetrics(scoreSeries, 7), [scoreSeries]);
+  const metrics30 = useMemo(() => getWindowMetrics(scoreSeries, 30), [scoreSeries]);
+
   const logMap = useMemo(() => {
     const map = new Map<string, LogRow>();
     logs.forEach((row) => map.set(row.date, row));
     return map;
   }, [logs]);
-
-  const { avg7, avg30, count7, count30 } = useMemo(() => {
-    const today = startOfDay(new Date());
-    let sum7 = 0;
-    let sum30 = 0;
-    let c7 = 0;
-    let c30 = 0;
-
-    for (let i = 0; i < 30; i += 1) {
-      const key = toDateKey(addDays(today, -i));
-      const row = logMap.get(key);
-      if (row) {
-        sum30 += row.total_score ?? 0;
-        c30 += 1;
-        if (i < 7) {
-          sum7 += row.total_score ?? 0;
-          c7 += 1;
-        }
-      }
-    }
-
-    return {
-      avg7: c7 ? sum7 / c7 : 0,
-      avg30: c30 ? sum30 / c30 : 0,
-      count7: c7,
-      count30: c30,
-    };
-  }, [logMap]);
 
   const consistencyStreak = useMemo(() => {
     const today = startOfDay(new Date());
@@ -253,17 +230,39 @@ export default function DashboardPage() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <MetricCard
             label="7-Day Avg"
-            value={formatScore(avg7)}
-            delta="+4.2"
+            value={metrics7.currentAvg === null ? "—" : formatScore(metrics7.currentAvg)}
+            delta={
+              metrics7.delta === null || metrics7.delta === 0
+                ? undefined
+                : `${metrics7.delta > 0 ? "+" : ""}${formatScore(metrics7.delta)}`
+            }
             deltaLabel="from prior 7 days"
-            positive
+            positive={metrics7.delta !== null && metrics7.delta > 0}
+            subtext={
+              metrics7.delta === null
+                ? "Not enough data"
+                : metrics7.delta === 0
+                  ? "No change from prior 7 days"
+                  : undefined
+            }
           />
           <MetricCard
             label="30-Day Avg"
-            value={formatScore(avg30)}
-            delta="+1.1"
+            value={metrics30.currentAvg === null ? "—" : formatScore(metrics30.currentAvg)}
+            delta={
+              metrics30.delta === null || metrics30.delta === 0
+                ? undefined
+                : `${metrics30.delta > 0 ? "+" : ""}${formatScore(metrics30.delta)}`
+            }
             deltaLabel="from prior 30 days"
-            positive
+            positive={metrics30.delta !== null && metrics30.delta > 0}
+            subtext={
+              metrics30.delta === null
+                ? "Not enough data"
+                : metrics30.delta === 0
+                  ? "No change from prior 30 days"
+                  : undefined
+            }
           />
           <MetricCard label="Most Improved" value={mostImproved} subtext="Last 14 days" />
           <MetricCard
